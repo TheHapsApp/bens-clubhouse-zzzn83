@@ -488,40 +488,26 @@
 
     /* ---- Adventure background music (an original looping chiptune) ---- */
     // 0 = a rest (no note). Numbers are note pitches in Hz.
-    // A whole playlist of little songs — the music plays them one after another!
+    // These 6 parts are all the SAME key, beat, and bassline, so they play
+    // back-to-back like one big adventure song: intro, build, theme, calm, rise, finale.
+    var ADV_STEP = 0.16;
+    var ADV_TYPE = "square";
+    // shared walking bassline over the chords C - G - Am - F (roots + fifths)
+    var advBass = [131, 196, 131, 196, 196, 147, 196, 147, 220, 165, 220, 165, 175, 131, 175, 131];
+
+    function advPart(lead) {
+      return { lead: lead, bass: advBass, step: ADV_STEP, type: ADV_TYPE };
+    }
+
     var songs = [
-      { // 1. bright marching adventure
-        lead: [523, 659, 784, 659, 880, 784, 659, 587, 523, 587, 659, 784, 1047, 0, 784, 0],
-        bass: [131, 131, 196, 196, 110, 110, 175, 175, 131, 131, 196, 196, 175, 175, 98, 98],
-        step: 0.19, type: "square"
-      },
-      { // 2. bouncy mysterious minor
-        lead: [440, 0, 523, 587, 0, 659, 587, 523, 440, 0, 392, 440, 0, 330, 0, 392],
-        bass: [110, 110, 0, 146, 164, 164, 0, 146, 110, 110, 0, 98, 87, 87, 0, 98],
-        step: 0.15, type: "triangle"
-      },
-      { // 3. fast happy skip
-        lead: [659, 784, 880, 784, 988, 880, 784, 659, 587, 659, 784, 880, 988, 1047, 988, 880],
-        bass: [165, 0, 220, 0, 196, 0, 247, 0, 165, 0, 220, 0, 196, 0, 131, 0],
-        step: 0.13, type: "square"
-      },
-      { // 4. slow gentle waltz
-        lead: [392, 0, 523, 0, 659, 0, 587, 0, 523, 0, 440, 0, 392, 0, 0, 0],
-        bass: [98, 98, 98, 131, 131, 131, 110, 110, 110, 87, 87, 87, 98, 98, 98, 98],
-        step: 0.22, type: "triangle"
-      },
-      { // 5. spooky low creeper
-        lead: [294, 349, 294, 392, 349, 294, 262, 294, 294, 349, 392, 440, 392, 349, 294, 0],
-        bass: [73, 73, 87, 87, 73, 73, 65, 65, 73, 73, 87, 87, 98, 98, 73, 73],
-        step: 0.17, type: "sawtooth"
-      },
-      { // 6. super-fast arcade chase
-        lead: [784, 880, 988, 1047, 988, 880, 784, 698, 784, 880, 988, 1175, 1047, 988, 880, 784],
-        bass: [196, 196, 247, 247, 220, 220, 175, 175, 196, 196, 247, 247, 262, 262, 196, 196],
-        step: 0.11, type: "square"
-      }
+      advPart([523, 587, 659, 587, 523, 0, 659, 0, 587, 659, 698, 659, 587, 0, 523, 0]),       // intro
+      advPart([659, 698, 784, 880, 784, 698, 659, 0, 587, 659, 784, 880, 988, 880, 784, 0]),    // build-up
+      advPart([784, 880, 988, 880, 784, 659, 587, 659, 698, 784, 880, 988, 1047, 988, 880, 784]),// main theme
+      advPart([440, 523, 587, 523, 440, 0, 523, 0, 392, 440, 523, 587, 659, 587, 523, 0]),       // calm bridge
+      advPart([523, 659, 784, 988, 880, 784, 659, 587, 659, 784, 880, 1047, 988, 880, 784, 0]),  // rising
+      advPart([1047, 988, 880, 784, 880, 988, 1047, 1175, 1047, 880, 784, 659, 698, 784, 880, 1047]) // big finale
     ];
-    var musicBar = 0; // counts which little song we're on
+    var musicBar = 0; // counts which part of the adventure song we're on
     var musicOn = false;
     var musicAllowed = true; // false if you turn it off on purpose
     var musicTimer = null;
