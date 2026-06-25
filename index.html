@@ -488,11 +488,17 @@
 
     /* ---- Adventure background music (an original looping chiptune) ---- */
     // 0 = a rest (no note). Numbers are note pitches in Hz.
-    var musicLead = [523, 659, 784, 659, 880, 784, 659, 587,
-                     523, 587, 659, 784, 1047, 0, 784, 0];
-    var musicBass = [131, 131, 196, 196, 110, 110, 175, 175,
-                     131, 131, 196, 196, 175, 175, 98, 98];
-    var STEP = 0.18; // seconds per note
+    // --- Song A: a bright, marching adventure tune ---
+    var leadA = [523, 659, 784, 659, 880, 784, 659, 587,
+                 523, 587, 659, 784, 1047, 0, 784, 0];
+    var bassA = [131, 131, 196, 196, 110, 110, 175, 175,
+                 131, 131, 196, 196, 175, 175, 98, 98];
+    // --- Song B: a bouncy, faster, mysterious tune (sounds quite different) ---
+    var leadB = [440, 0, 523, 587, 0, 659, 587, 523,
+                 440, 0, 392, 440, 0, 330, 0, 392];
+    var bassB = [110, 110, 0, 146, 164, 164, 0, 146,
+                 110, 110, 0, 98, 87, 87, 0, 98];
+    var musicBar = 0; // counts which little song we're on
     var musicOn = false;
     var musicAllowed = true; // false if you turn it off on purpose
     var musicTimer = null;
@@ -512,12 +518,21 @@
     function scheduleBar() {
       if (!musicOn) return;
       var ac = ensureAudio(); if (!ac) return;
+
+      // Switch songs each time: A, B, A, B, ...
+      var useB = (musicBar % 2 === 1);
+      var lead = useB ? leadB : leadA;
+      var bass = useB ? bassB : bassA;
+      var step = useB ? 0.15 : 0.19;          // Song B is a bit faster
+      var leadType = useB ? "triangle" : "square"; // and a different sound
+
       var t = ac.currentTime + 0.05;
-      for (var i = 0; i < musicLead.length; i++) {
-        playNote(musicLead[i], t + i * STEP, STEP * 0.9, "square", 0.06);
-        playNote(musicBass[i], t + i * STEP, STEP * 0.9, "triangle", 0.09);
+      for (var i = 0; i < lead.length; i++) {
+        playNote(lead[i], t + i * step, step * 0.9, leadType, 0.06);
+        playNote(bass[i], t + i * step, step * 0.9, "triangle", 0.09);
       }
-      musicTimer = setTimeout(scheduleBar, musicLead.length * STEP * 1000); // loop
+      musicBar++;
+      musicTimer = setTimeout(scheduleBar, lead.length * step * 1000); // next song
     }
 
     function updateMusicBtn() {
