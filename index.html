@@ -837,6 +837,19 @@
       playBoom();
     }
 
+    // Shooting yourself off the top of the screen — red + blue particles, start over!
+    function blastOff() {
+      var py = Math.max(guy.y, 0);
+      for (var i = 0; i < 8; i++) {
+        makeSparkles(guy.x, py, "#ff2a2a"); // red
+        makeSparkles(guy.x, py, "#2a6bff"); // blue
+      }
+      playBoom();
+      score = 0;
+      scoreNum.textContent = "0";
+      triggerGameOver();
+    }
+
     function spawnBalloon() {
       balloons.push({
         x: 30 + Math.random() * (W - 60),
@@ -1020,6 +1033,8 @@
       // RECOIL! the blast kicks you back the opposite way the bullet went
       guy.y += -dir * (big ? 90 : 55);
       playShoot();
+      // If the recoil shoved you off the screen, you blast off and start over!
+      if (guy.y < 0 || guy.y > H) { blastOff(); }
     }
 
     function makeSparkles(x, y, color) {
