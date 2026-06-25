@@ -463,6 +463,7 @@
       dangerBalloons.length = 0;
       dangerCooldown = 700;
       dangerPending = false;
+      dangerWaveActive = false;
       ultimateActive = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
@@ -632,6 +633,8 @@
     var dangerWarnUntil = 0;    // flash the red/white warning until this time
     var dangerPending = false;  // a wave is warned and about to spawn
     var dangerSpawnAt = 0;      // when the warned wave actually appears
+    var dangerWaveActive = false; // a wave is currently on screen
+    var dangerHitThisWave = false; // did a spike touch the guy this wave?
 
     function spawnDangerWave() {
       var count = 5 + Math.floor(Math.random() * 4);
@@ -643,6 +646,8 @@
           speed: 1.1 + Math.random() * 1.1
         });
       }
+      dangerWaveActive = true;
+      dangerHitThisWave = false;
     }
 
     // ---- ULTIMATE: power up while already powered = giant red/white explosion ----
@@ -957,6 +962,7 @@
           if (Math.sqrt(ddx * ddx + ddy * ddy) < d.r + gw / 2) {
             explode(guy.x, guy.y);
             playBonk();
+            dangerHitThisWave = true; // no dodge bonus this wave
             lives -= 3;
             if (lives < 0) lives = 0;
             updateLives();
@@ -971,6 +977,16 @@
         }
 
         if (d.y + d.r < -40) dangerBalloons.splice(di, 1); // floated away
+      }
+
+      // Survived a whole wave without getting hit? +6 points for the dodge!
+      if (dangerWaveActive && dangerBalloons.length === 0) {
+        dangerWaveActive = false;
+        if (!dangerHitThisWave && !gameOver) {
+          score += 6;
+          makeFloater(W / 2, 170, "+6 DODGED!", "#5fff8f");
+          bumpScore();
+        }
       }
 
       // Flashing RED/WHITE warning before the spikes come up
