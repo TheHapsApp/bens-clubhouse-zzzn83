@@ -785,10 +785,12 @@
         color = "#ff6a00";
         points = 3;
       }
+      var dir = flipped ? 1 : -1; // upside down = shoot DOWN (the wrong way!)
       bullets.push({
         x: guy.x,
-        y: guy.y - guy.h / 2 - 8,
+        y: guy.y + dir * (guy.h / 2 + 8),
         speed: 9,
+        dir: dir,
         r: radius,
         big: !!big,
         color: color,
@@ -1128,7 +1130,7 @@
       // Draw + move bullets, check for pops
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
-        bu.y -= bu.speed;
+        bu.y += bu.speed * (bu.dir || -1); // dir -1 = up, +1 = down
         ctx.fillStyle = bu.color || "#fff";
         ctx.beginPath();
         ctx.arc(bu.x, bu.y, bu.r, 0, Math.PI * 2);
@@ -1141,7 +1143,7 @@
           ctx.stroke();
         }
 
-        if (bu.y + bu.r < -10) { bullets.splice(j, 1); continue; }
+        if (bu.y + bu.r < -10 || bu.y - bu.r > H + 10) { bullets.splice(j, 1); continue; }
 
         // A SUPER shot hitting the rainbow ball powers up the guy!
         if (rainbowBall && bu.big) {
