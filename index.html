@@ -70,6 +70,20 @@
       margin-top: 10px;
       text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
     }
+    /* The score number spins when it changes */
+    #scoreNum {
+      display: inline-block;
+      font-size: 1.7rem;
+      font-weight: bold;
+    }
+    #scoreNum.spin {
+      animation: scorespin 1s ease;
+    }
+    @keyframes scorespin {
+      0%   { transform: rotate(0deg)   scale(1); }
+      50%  { transform: rotate(360deg) scale(1.6); color: #ffd23f; }
+      100% { transform: rotate(720deg) scale(1); }
+    }
 
     /* The big countdown box */
     .countdown {
@@ -138,7 +152,7 @@
     <h1>🎂 Birthday Countdown! 🎉</h1>
     <p class="hint">Press a box and type in your answer! 👇</p>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
-    <div class="score" id="score">Score: 0</div>
+    <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
       <div class="number" id="days">--</div>
@@ -320,6 +334,15 @@
 
     function makeFloater(x, y, text, color) {
       floaters.push({ x: x, y: y, text: text, color: color, life: 50 });
+    }
+
+    // Spin the score number, then flip it to the new total halfway through
+    var scoreNum = document.getElementById("scoreNum");
+    function bumpScore() {
+      scoreNum.classList.remove("spin");
+      void scoreNum.offsetWidth; // restart the animation from the start
+      scoreNum.classList.add("spin");
+      setTimeout(function () { scoreNum.textContent = score; }, 480);
     }
 
     // The triangle guy. He glides toward the mouse like a ball in agar.io.
@@ -508,12 +531,12 @@
           var dy = bu.y - bal.y;
           if (Math.sqrt(dx * dx + dy * dy) < bal.r + bu.r) {
             makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
-            if (bu.points > 1) {
-              makeFloater(bal.drawX || bal.x, bal.y, "+" + bu.points, bu.color);
-            }
+            // Always show how many points this pop was worth
+            var fColor = bu.points === 1 ? "#6a2cff" : bu.color;
+            makeFloater(bal.drawX || bal.x, bal.y, "+" + bu.points, fColor);
             balloons.splice(k, 1);
             score += bu.points;
-            document.getElementById("score").textContent = "Score: " + score;
+            bumpScore();
             if (!bu.big) { // small bullets stop at the first balloon...
               bullets.splice(j, 1);
               bulletGone = true;
