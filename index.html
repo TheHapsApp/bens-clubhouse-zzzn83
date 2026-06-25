@@ -235,6 +235,21 @@
       updateCountdown();
     });
 
+    // Try to read a time like "2:00 PM", "2pm", or "14:30" from the time box.
+    // Returns { h: 0-23, m: 0-59 } or null if we can't understand it.
+    function parseTime(text) {
+      if (!text) return null;
+      var m = text.match(/(\d{1,2})\s*(?::\s*(\d{2}))?\s*(am|pm)?/i);
+      if (!m) return null;
+      var h = parseInt(m[1], 10);
+      var min = m[2] ? parseInt(m[2], 10) : 0;
+      var ampm = m[3] ? m[3].toLowerCase() : "";
+      if (ampm === "pm" && h < 12) h += 12;
+      if (ampm === "am" && h === 12) h = 0;
+      if (h > 23 || min > 59) return null;
+      return { h: h, m: min };
+    }
+
     function updateCountdown() {
       var raw = localStorage.getItem("bday_when_raw");
       var numberEl = document.getElementById("days");
@@ -248,13 +263,40 @@
       var birthday = new Date(p[0], p[1] - 1, p[2], 0, 0, 0);
       var now = new Date();
       var days = Math.ceil((birthday - now) / (1000 * 60 * 60 * 24));
-      if (days > 1)       { numberEl.textContent = days; labelEl.textContent = "days until the big day!"; }
-      else if (days === 1){ numberEl.textContent = "1"; labelEl.textContent = "day to go! Almost here!"; }
-      else if (days === 0){ numberEl.textContent = "🎉"; labelEl.textContent = "IT'S TODAY! HAPPY BIRTHDAY!"; }
-      else                { numberEl.textContent = "🎂"; labelEl.textContent = "Hope it was a great party!"; }
+
+      if (days > 1)        { numberEl.textContent = days; labelEl.textContent = "days until the big day!"; }
+      else if (days === 1) { numberEl.textContent = "1"; labelEl.textContent = "day to go! Almost here!"; }
+      else if (days === 0) {
+        // It's TODAY! Count down the hours and minutes until party time.
+        var t = parseTime(localStorage.getItem("bday_time"));
+        if (t) {
+          var party = new Date(p[0], p[1] - 1, p[2], t.h, t.m, 0);
+          var diff = party - now;
+          if (diff > 0) {
+            var totalMin = Math.floor(diff / (1000 * 60));
+            var hrs = Math.floor(totalMin / 60);
+            var mins = totalMin % 60;
+            if (hrs > 0) {
+              numberEl.textContent = hrs + "h " + mins + "m";
+              labelEl.textContent = "until the party starts! 🎉";
+            } else {
+              numberEl.textContent = mins + (mins === 1 ? " minute" : " minutes");
+              labelEl.textContent = "until the party starts! 🎉";
+            }
+          } else {
+            numberEl.textContent = "🎉";
+            labelEl.textContent = "IT'S PARTY TIME! HAPPY BIRTHDAY!";
+          }
+        } else {
+          // No time typed in yet — just celebrate the day
+          numberEl.textContent = "🎉";
+          labelEl.textContent = "IT'S TODAY! HAPPY BIRTHDAY!";
+        }
+      }
+      else { numberEl.textContent = "🎂"; labelEl.textContent = "Hope it was a great party!"; }
     }
     updateCountdown();
-    setInterval(updateCountdown, 1000 * 60 * 60);
+    setInterval(updateCountdown, 1000); // tick every second so the minutes count down
 
 
     /* ===================== THE BALLOON GAME ===================== */
