@@ -507,6 +507,13 @@
       advPart([523, 659, 784, 988, 880, 784, 659, 587, 659, 784, 880, 1047, 988, 880, 784, 0]),  // rising
       advPart([1047, 988, 880, 784, 880, 988, 1047, 1175, 1047, 880, 784, 659, 698, 784, 880, 1047]) // big finale
     ];
+    // CHAOS! fast, wild, jumpy music that plays while you're powered up
+    var chaosSong = {
+      lead: [1047, 523, 988, 587, 880, 494, 1175, 659, 784, 466, 1047, 622, 988, 523, 1319, 698],
+      bass: [131, 262, 110, 220, 147, 294, 98, 196, 131, 262, 117, 233, 110, 220, 175, 87],
+      step: 0.09, type: "sawtooth"
+    };
+
     var musicBar = 0; // counts which part of the adventure song we're on
     var musicOn = false;
     var musicAllowed = true; // false if you turn it off on purpose
@@ -528,8 +535,9 @@
       if (!musicOn) return;
       var ac = ensureAudio(); if (!ac) return;
 
-      // Play the next song in the playlist, then loop back to the start
-      var song = songs[musicBar % songs.length];
+      // While powered up, play the wild chaotic music; otherwise the adventure playlist
+      var poweredUp = rainbowMode || fireMode;
+      var song = poweredUp ? chaosSong : songs[musicBar % songs.length];
       var lead = song.lead, bass = song.bass, step = song.step;
 
       var t = ac.currentTime + 0.05;
