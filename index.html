@@ -349,21 +349,36 @@
       balloons[i].y = Math.random() * H; // start scattered
     }
 
-    // Press S to shoot
+    // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
+    var isCharging = false;
+    var chargeStart = 0;
+    var CHARGE_MS = 350; // hold this long to make it a big bullet
+
     window.addEventListener("keydown", function (e) {
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
-        shoot();
+        if (e.repeat) return;          // ignore the keyboard auto-repeats
+        isCharging = true;
+        chargeStart = performance.now();
+      }
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "s" || e.key === "S") {
+        if (!isCharging) return;
+        var held = performance.now() - chargeStart;
+        isCharging = false;
+        shoot(held >= CHARGE_MS); // held long enough = big bullet
       }
     });
 
-    var canShoot = true;
-    function shoot() {
-      if (!canShoot) return;
-      canShoot = false;
-      setTimeout(function () { canShoot = true; }, 180); // little cooldown
-      // Bullet flies up out of the guy's head
-      bullets.push({ x: guy.x, y: guy.y - guy.h / 2 - 8, speed: 9 });
+    function shoot(big) {
+      bullets.push({
+        x: guy.x,
+        y: guy.y - guy.h / 2 - 8,
+        speed: 9,
+        r: big ? 25 : 5,   // big bullet is 5x bigger
+        big: !!big
+      });
     }
 
     function makeSparkles(x, y, color) {
@@ -429,24 +444,37 @@
         bu.y -= bu.speed;
         ctx.fillStyle = "#fff";
         ctx.beginPath();
-        ctx.arc(bu.x, bu.y, 5, 0, Math.PI * 2);
+        ctx.arc(bu.x, bu.y, bu.r, 0, Math.PI * 2);
         ctx.fill();
+        if (bu.big) { // a glowy ring so the big one looks powerful
+          ctx.strokeStyle = "#ffd23f";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(bu.x, bu.y, bu.r + 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
-        if (bu.y < -10) { bullets.splice(j, 1); continue; }
+        if (bu.y + bu.r < -10) { bullets.splice(j, 1); continue; }
 
+        var bulletGone = false;
         for (var k = balloons.length - 1; k >= 0; k--) {
           var bal = balloons[k];
           var dx = bu.x - (bal.drawX || bal.x);
           var dy = bu.y - bal.y;
-          if (Math.sqrt(dx * dx + dy * dy) < bal.r + 5) {
+          if (Math.sqrt(dx * dx + dy * dy) < bal.r + bu.r) {
             makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
             balloons.splice(k, 1);
-            bullets.splice(j, 1);
             score++;
             document.getElementById("score").textContent = "Balloons popped: " + score;
-            break;
+            if (!bu.big) { // small bullets stop at the first balloon...
+              bullets.splice(j, 1);
+              bulletGone = true;
+              break;
+            }
+            // ...the big bullet plows right through and keeps popping!
           }
         }
+        if (bulletGone) continue;
       }
 
       // Draw + fade sparkles
@@ -460,6 +488,16 @@
         ctx.fill();
         ctx.globalAlpha = 1;
         if (sp.life <= 0) sparkles.splice(s, 1);
+      }
+
+      // While holding S, show a charge ball growing on the guy's head
+      if (isCharging) {
+        var heldNow = performance.now() - chargeStart;
+        var charge = Math.min(heldNow / CHARGE_MS, 1); // 0 to 1
+        ctx.fillStyle = charge >= 1 ? "#ffd23f" : "rgba(255,255,255,0.85)";
+        ctx.beginPath();
+        ctx.arc(guy.x, guy.y - guy.h / 2 - 12, 4 + charge * 21, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
