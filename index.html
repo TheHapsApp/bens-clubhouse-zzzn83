@@ -184,6 +184,7 @@
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
+    <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
@@ -433,6 +434,37 @@
       });
     }
 
+    // happy "power up!" sound when you grab the rainbow
+    function playPowerup() {
+      var ac = ensureAudio(); if (!ac) return;
+      var seq = [392, 523, 659, 784];
+      var t = ac.currentTime + 0.02;
+      seq.forEach(function (f) {
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = "triangle";
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + 0.13);
+        t += 0.09;
+      });
+    }
+    // big "BOOM" when you blow up the balloons around you
+    function playBoom() {
+      var ac = ensureAudio(); if (!ac) return;
+      var dur = 0.35, len = Math.floor(ac.sampleRate * dur);
+      var buffer = ac.createBuffer(1, len, ac.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = ac.createBufferSource(); src.buffer = buffer;
+      var filt = ac.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 500;
+      var g = ac.createGain(); g.gain.value = 0.6;
+      src.connect(filt); filt.connect(g); g.connect(ac.destination);
+      src.start();
+    }
+
     var balloonColors = ["#ff5fa2", "#ffd23f", "#3fd0ff", "#8a5cff", "#5fff8f", "#ff8f3f"];
     var balloons = [];
     var bullets = [];
@@ -461,6 +493,9 @@
       bullets.length = 0;
       superUsed = 0;
       superLockedUntil = 0;
+      rainbowBall = null;
+      rainbowMode = false;
+      rainbowCooldown = 500;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -472,6 +507,30 @@
     // Press R to play again after Game Over
     window.addEventListener("keydown", function (e) {
       if ((e.key === "r" || e.key === "R") && gameOver) restartGame();
+    });
+
+    // Press U while powered up: explode all balloons around the guy
+    window.addEventListener("keydown", function (e) {
+      if ((e.key === "u" || e.key === "U") && rainbowMode && !gameOver) {
+        var radius = 320;
+        var popped = 0;
+        for (var k = balloons.length - 1; k >= 0; k--) {
+          var bal = balloons[k];
+          var dx = (bal.drawX || bal.x) - guy.x;
+          var dy = bal.y - guy.y;
+          if (Math.sqrt(dx * dx + dy * dy) < radius) {
+            makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
+            makeFloater(bal.drawX || bal.x, bal.y, "+1", "#6a2cff");
+            balloons.splice(k, 1);
+            score += 1;
+            popped++;
+          }
+        }
+        if (popped > 0) bumpScore();
+        playBoom();
+        explode(guy.x, guy.y);
+        rainbowMode = false; // power used up
+      }
     });
 
     function makeFloater(x, y, text, color) {
@@ -543,6 +602,22 @@
     for (var i = 0; i < 8; i++) {
       spawnBalloon();
       balloons[i].y = Math.random() * H; // start scattered
+    }
+
+    // ---- The rainbow power-up ball ----
+    var rainbowBall = null;     // {x, y, r, vx, vy}
+    var rainbowMode = false;    // is the guy powered up?
+    var rainbowCooldown = 500;  // frames until the next ball appears
+    var tick = 0;               // counts frames, used for rainbow colors
+
+    function spawnRainbowBall() {
+      rainbowBall = {
+        x: 80 + Math.random() * (W - 160),
+        y: 120 + Math.random() * (H - 240),
+        r: 38,
+        vx: (Math.random() < 0.5 ? -1 : 1) * 1.6,
+        vy: (Math.random() < 0.5 ? -1 : 1) * 1.2
+      };
     }
 
     // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
@@ -632,6 +707,7 @@
     var spawnTimer = 0;
     function loop() {
       ctx.clearRect(0, 0, W, H);
+      tick++;
 
       // Start the guy (and the target) in the middle
       if (guy.x < 0) { guy.x = W / 2; guy.y = H / 2; }
@@ -700,6 +776,25 @@
         if (b.y + b.r < -30) balloons.splice(i, 1); // floated off the top
       }
 
+      // ---- Rainbow ball: spawn, move, draw ----
+      if (!gameOver && !rainbowBall && !rainbowMode) {
+        rainbowCooldown--;
+        if (rainbowCooldown <= 0) spawnRainbowBall();
+      }
+      if (rainbowBall) {
+        var rb = rainbowBall;
+        rb.x += rb.vx; rb.y += rb.vy;
+        if (rb.x < rb.r || rb.x > W - rb.r) rb.vx *= -1;        // bounce off edges
+        if (rb.y < rb.r || rb.y > H - rb.r) rb.vy *= -1;
+        // draw rainbow rings
+        for (var ring = 6; ring >= 1; ring--) {
+          ctx.fillStyle = "hsl(" + ((tick * 5 + ring * 55) % 360) + ", 90%, 60%)";
+          ctx.beginPath();
+          ctx.arc(rb.x, rb.y, rb.r * ring / 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       // Draw + move bullets, check for pops
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
@@ -717,6 +812,19 @@
         }
 
         if (bu.y + bu.r < -10) { bullets.splice(j, 1); continue; }
+
+        // A SUPER shot hitting the rainbow ball powers up the guy!
+        if (rainbowBall && bu.big) {
+          var rdx = bu.x - rainbowBall.x;
+          var rdy = bu.y - rainbowBall.y;
+          if (Math.sqrt(rdx * rdx + rdy * rdy) < rainbowBall.r + bu.r) {
+            rainbowMode = true;
+            rainbowBall = null;
+            rainbowCooldown = 600 + Math.floor(Math.random() * 600);
+            explode(bu.x, bu.y);
+            playPowerup();
+          }
+        }
 
         var bulletGone = false;
         for (var k = balloons.length - 1; k >= 0; k--) {
@@ -794,13 +902,25 @@
 
       // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
       var gy = guy.y - guy.h / 2; // top of the triangle
-      ctx.fillStyle = "#fff";
+      // Rainbow color when powered up, otherwise white
+      ctx.fillStyle = rainbowMode ? "hsl(" + (tick * 8 % 360) + ", 95%, 60%)" : "#fff";
       ctx.beginPath();
       ctx.moveTo(guy.x, gy);                       // top point
       ctx.lineTo(guy.x - guy.w / 2, gy + guy.h);   // bottom left
       ctx.lineTo(guy.x + guy.w / 2, gy + guy.h);   // bottom right
       ctx.closePath();
       ctx.fill();
+
+      // "Press U!" reminder floating above the powered-up guy
+      if (rainbowMode) {
+        ctx.textAlign = "center";
+        ctx.font = "bold 22px 'Comic Sans MS', sans-serif";
+        ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 55%)";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 4;
+        ctx.strokeText("Press U!", guy.x, gy - 14);
+        ctx.fillText("Press U!", guy.x, gy - 14);
+      }
       // little eyes so he's a "guy"
       ctx.fillStyle = "#6a2cff";
       ctx.beginPath(); ctx.arc(guy.x - 6, gy + guy.h - 12, 3, 0, Math.PI * 2); ctx.fill();
