@@ -969,6 +969,18 @@
         ctx.moveTo(d.x + 7, d.y - 6); ctx.lineTo(d.x - 7, d.y + 3);
         ctx.stroke();
 
+        // A spike touching a normal balloon pops it — but NO points (you didn't do it)
+        for (var pb = balloons.length - 1; pb >= 0; pb--) {
+          var nb = balloons[pb];
+          var pdx = (nb.drawX || nb.x) - d.x;
+          var pdy = nb.y - d.y;
+          if (Math.sqrt(pdx * pdx + pdy * pdy) < nb.r + d.r) {
+            makeSparkles(nb.drawX || nb.x, nb.y, nb.color);
+            playPop();
+            balloons.splice(pb, 1);
+          }
+        }
+
         // Blocked by a wall? (this is how hiding works)
         var blocked = false;
         for (var wi = 0; wi < walls.length; wi++) {
