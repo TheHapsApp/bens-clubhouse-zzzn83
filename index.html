@@ -390,7 +390,7 @@
       var ac = ensureAudio(); if (!ac) return;
 
       // While powered up, play the wild chaotic music; otherwise the adventure playlist
-      var poweredUp = rainbowMode || fireMode;
+      var poweredUp = rainbowMode || fireMode || ultimateActive;
       var song = poweredUp ? chaosSong : songs[musicBar % songs.length];
       var lead = song.lead, bass = song.bass, step = song.step;
 
@@ -462,6 +462,8 @@
       escapingBalls.length = 0;
       dangerBalloons.length = 0;
       dangerCooldown = 700;
+      dangerPending = false;
+      ultimateActive = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -627,7 +629,9 @@
     // ---- Danger wave: un-poppable balloons you must hide from ----
     var dangerBalloons = [];
     var dangerCooldown = 200;   // frames until the first danger wave (comes quick!)
-    var dangerWarnUntil = 0;    // show the warning text until this time
+    var dangerWarnUntil = 0;    // flash the red/white warning until this time
+    var dangerPending = false;  // a wave is warned and about to spawn
+    var dangerSpawnAt = 0;      // when the warned wave actually appears
 
     function spawnDangerWave() {
       var count = 5 + Math.floor(Math.random() * 4);
@@ -639,8 +643,15 @@
           speed: 1.1 + Math.random() * 1.1
         });
       }
-      dangerWarnUntil = Date.now() + 2500;
-      playBonk();
+    }
+
+    // ---- ULTIMATE: power up while already powered = giant red/white explosion ----
+    var ultimateActive = false;
+    var ultimateUntil = 0;
+    function triggerUltimate() {
+      ultimateActive = true;
+      ultimateUntil = Date.now() + 1600; // flash + grow for 1.6s, then BOOM
+      playPowerup();
     }
 
     // ---- The fire power-up ball ----
@@ -771,6 +782,25 @@
       // Fire mode wears off after its timer
       if (fireMode && Date.now() > fireUntil) fireMode = false;
 
+      // ULTIMATE finishes: EXPLODE — every balloon on screen pops for 100 points!
+      if (ultimateActive && Date.now() > ultimateUntil) {
+        var gained = 0;
+        for (var ui = balloons.length - 1; ui >= 0; ui--) {
+          var ub = balloons[ui];
+          makeSparkles(ub.drawX || ub.x, ub.y, ub.color);
+          makeFloater(ub.drawX || ub.x, ub.y, "+100", "#ff2a2a");
+          score += 100;
+          gained++;
+        }
+        balloons.length = 0;
+        if (gained > 0) bumpScore();
+        playBoom();
+        explode(guy.x, guy.y);
+        ultimateActive = false;
+        rainbowMode = false;
+        fireMode = false; // the powers are all used up
+      }
+
       // Start the guy (and the target) in the middle
       if (guy.x < 0) { guy.x = W / 2; guy.y = H / 2; }
       if (mouse.x < 0) { mouse.x = W / 2; mouse.y = H / 2; }
@@ -785,7 +815,7 @@
       var guySafe = guyIsSafe();
 
       // The guy (and his hitbox) is bigger while fire mode is on
-      var sizeMul = fireMode ? 1.9 : 1;
+      var sizeMul = ultimateActive ? 3.4 : (fireMode ? 1.9 : 1);
       var gw = guy.w * sizeMul;
       var gh = guy.h * sizeMul;
 
@@ -826,7 +856,7 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && !guySafe && !gameOver &&
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive &&
             Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
@@ -865,8 +895,19 @@
       });
 
       if (!gameOver) {
-        dangerCooldown--;
-        if (dangerCooldown <= 0 && dangerBalloons.length === 0) {
+        // Step 1: count down, then start the red/white warning
+        if (!dangerPending && dangerBalloons.length === 0) {
+          dangerCooldown--;
+          if (dangerCooldown <= 0) {
+            dangerPending = true;
+            dangerWarnUntil = Date.now() + 2000; // flash red/white for 2 seconds
+            dangerSpawnAt = Date.now() + 2000;
+            playBonk();
+          }
+        }
+        // Step 2: after the warning flash, the spikes actually come up
+        if (dangerPending && Date.now() >= dangerSpawnAt) {
+          dangerPending = false;
           spawnDangerWave();
           dangerCooldown = 900 + Math.floor(Math.random() * 700);
         }
@@ -911,7 +952,7 @@
         }
 
         // Did it hit the guy? Lose 3 lives!
-        if (guy.x > 0 && !guySafe && !gameOver) {
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive) {
           var ddx = d.x - guy.x, ddy = d.y - guy.y;
           if (Math.sqrt(ddx * ddx + ddy * ddy) < d.r + gw / 2) {
             explode(guy.x, guy.y);
@@ -932,15 +973,23 @@
         if (d.y + d.r < -40) dangerBalloons.splice(di, 1); // floated away
       }
 
-      // Flashing warning while a danger wave is rising
+      // Flashing RED/WHITE warning before the spikes come up
       if (Date.now() < dangerWarnUntil) {
+        ctx.fillStyle = (tick % 10 < 5) ? "rgba(255,0,0,0.35)" : "rgba(255,255,255,0.35)";
+        ctx.fillRect(0, 0, W, H);
         ctx.textAlign = "center";
-        ctx.font = "bold 32px 'Comic Sans MS', sans-serif";
-        ctx.fillStyle = (tick % 20 < 10) ? "#ff2a2a" : "#ffd23f";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 4;
-        ctx.strokeText("⚠️ DANGER! Hide behind a wall!", W / 2, 100);
-        ctx.fillText("⚠️ DANGER! Hide behind a wall!", W / 2, 100);
+        ctx.font = "bold 38px 'Comic Sans MS', sans-serif";
+        ctx.fillStyle = (tick % 10 < 5) ? "#ff2a2a" : "#fff";
+        ctx.strokeStyle = (tick % 10 < 5) ? "#fff" : "#ff2a2a";
+        ctx.lineWidth = 5;
+        ctx.strokeText("⚠️ DANGER! Hide behind a wall!", W / 2, 110);
+        ctx.fillText("⚠️ DANGER! Hide behind a wall!", W / 2, 110);
+      }
+
+      // Flashing RED/WHITE screen during the ULTIMATE
+      if (ultimateActive) {
+        ctx.fillStyle = (tick % 6 < 3) ? "rgba(255,0,0,0.4)" : "rgba(255,255,255,0.4)";
+        ctx.fillRect(0, 0, W, H);
       }
 
       // ---- Rainbow ball: spawn, move, draw ----
@@ -1029,11 +1078,11 @@
           var rdx = bu.x - rainbowBall.x;
           var rdy = bu.y - rainbowBall.y;
           if (Math.sqrt(rdx * rdx + rdy * rdy) < rainbowBall.r + bu.r) {
-            rainbowMode = true;
             rainbowBall = null;
             rainbowCooldown = 600 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
-            playPowerup();
+            if (rainbowMode || fireMode) { triggerUltimate(); } // already powered = ULTIMATE!
+            else { rainbowMode = true; playPowerup(); }
           }
         }
 
@@ -1042,12 +1091,11 @@
           var fdx = bu.x - fireBall.x;
           var fdy = bu.y - fireBall.y;
           if (Math.sqrt(fdx * fdx + fdy * fdy) < fireBall.r + bu.r) {
-            fireMode = true;
-            fireUntil = Date.now() + 22000; // giant mode lasts 22 seconds
             fireBall = null;
             fireCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
-            playPowerup();
+            if (rainbowMode || fireMode) { triggerUltimate(); } // already powered = ULTIMATE!
+            else { fireMode = true; fireUntil = Date.now() + 22000; playPowerup(); }
           }
         }
 
@@ -1140,8 +1188,9 @@
       var jy = trying ? (Math.random() * 12 - 6) : 0;
       var cx = guy.x + jx;                 // jittered draw position
       var gy = guy.y - gh / 2 + jy;        // top of the triangle
-      // Fire = yellow, trying = yellow, rainbow = rainbow, otherwise white
-      if (fireMode)         ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
+      // Ultimate = flashing red/white, then fire/trying = yellow, rainbow, else white
+      if (ultimateActive)   ctx.fillStyle = (tick % 6 < 3) ? "#ff2a2a" : "#ffffff"; // flash!
+      else if (fireMode)    ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
       else if (trying)      ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // trying = yellow
       else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
       else                  ctx.fillStyle = "#fff";
