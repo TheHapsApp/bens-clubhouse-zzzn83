@@ -130,6 +130,72 @@
       100% { transform: rotate(720deg) scale(1); }
     }
 
+    /* Title + How-to-Play screens */
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: rgba(40, 10, 80, 0.82);
+      color: #fff;
+      text-align: center;
+      padding: 24px;
+    }
+    .screen.show { display: flex; }
+    .screen-title {
+      font-size: clamp(2.2rem, 9vw, 4.5rem);
+      text-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+      animation: pop 2.2s ease-in-out infinite;
+    }
+    .bigbtn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: clamp(1.6rem, 7vw, 2.6rem);
+      color: #fff;
+      background: linear-gradient(120deg, #ff5fa2, #ffd23f);
+      border: 5px solid #fff;
+      border-radius: 26px;
+      padding: 16px 48px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.3);
+    }
+    .bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+    .smallbtn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #6a2cff;
+      background: #fff;
+      border: 3px solid #fff;
+      border-radius: 18px;
+      padding: 10px 22px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+    }
+    .smallbtn:active { transform: translateY(2px); box-shadow: none; }
+    .lb {
+      background: rgba(255,255,255,0.16);
+      border: 3px dashed #fff;
+      border-radius: 20px;
+      padding: 14px 26px;
+      min-width: 240px;
+    }
+    .lb-title { font-size: 1.4rem; margin-bottom: 6px; }
+    .lb ol { list-style: decimal; padding-left: 28px; text-align: left; font-size: 1.2rem; }
+    .lb li { margin: 4px 0; }
+    .howlist {
+      list-style: none;
+      text-align: left;
+      max-width: 560px;
+      font-size: clamp(1rem, 3.6vw, 1.3rem);
+      line-height: 1.6;
+    }
+    .howlist li { margin: 6px 0; }
+
     /* Game Over screen */
     #gameover {
       position: fixed;
@@ -238,15 +304,98 @@
     <div class="score">Score: <span id="scoreNum">0</span></div>
   </div>
 
+  <!-- Title screen -->
+  <div id="title" class="screen show">
+    <div class="screen-title">🎈 Balloon Popper! 💥</div>
+    <button id="playBtn" class="bigbtn">▶ PLAY</button>
+    <button id="howBtn" class="smallbtn">❓ How to Play</button>
+    <div class="lb">
+      <div class="lb-title">🏆 High Scores</div>
+      <ol id="lbList"><li>No scores yet — be the first!</li></ol>
+    </div>
+  </div>
+
+  <!-- How to Play screen -->
+  <div id="howto" class="screen">
+    <div class="screen-title">❓ How to Play</div>
+    <ul class="howlist">
+      <li>🖱️ Move your <b>mouse</b> — your guy follows it!</li>
+      <li>🔫 Press <b>S</b> to shoot (you're upside down, so bullets go DOWN!)</li>
+      <li>✊ <b>Hold S</b> for a giant SUPER shot</li>
+      <li>🎈 Pop balloons for points — 🔴 red = 3, 🟣 purple = 5!</li>
+      <li>🌈🔥 SUPER-shoot the rainbow/fire balls for powers</li>
+      <li>💥 Power up while already powered = <b>ULTIMATE</b> (+100 each!)</li>
+      <li>💀 Hide above a <b>wall</b> from the spikes, or KABOOM!</li>
+      <li>🎵 Shoot the Music button • ⏸ Press <b>P</b> to pause</li>
+    </ul>
+    <button id="howBack" class="smallbtn">⬅ Back</button>
+  </div>
+
   <!-- Game Over screen -->
   <div id="gameover">
     <div class="go-title">💀 GAME OVER 💀</div>
     <div class="go-score">Final Score: <span id="finalScore">0</span></div>
+    <div class="lb">
+      <div class="lb-title">🏆 High Scores</div>
+      <ol id="lbListOver"></ol>
+    </div>
     <div class="go-again">Press R to play again! 🔁</div>
+    <button id="overTitleBtn" class="smallbtn">🏠 Title Screen</button>
   </div>
 
   <script>
 
+
+    /* ===================== TITLE SCREEN + LEADERBOARD ===================== */
+    var started = false; // becomes true when you press PLAY
+
+    function loadScores() {
+      try {
+        var raw = localStorage.getItem("bpopper_scores");
+        var arr = raw ? JSON.parse(raw) : [];
+        return arr.sort(function (a, b) { return b - a; }).slice(0, 5);
+      } catch (e) { return []; }
+    }
+    function saveScore(s) {
+      try {
+        var arr = loadScores();
+        arr.push(s);
+        arr.sort(function (a, b) { return b - a; });
+        arr = arr.slice(0, 5);
+        localStorage.setItem("bpopper_scores", JSON.stringify(arr));
+      } catch (e) {}
+    }
+    function renderLeaderboards() {
+      var scores = loadScores();
+      ["lbList", "lbListOver"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (scores.length === 0) { el.innerHTML = "<li>No scores yet — be the first!</li>"; return; }
+        el.innerHTML = scores.map(function (s) { return "<li>" + s + " points</li>"; }).join("");
+      });
+    }
+    renderLeaderboards();
+
+    function showScreen(id) {
+      ["title", "howto"].forEach(function (s) {
+        document.getElementById(s).classList.toggle("show", s === id);
+      });
+    }
+
+    document.getElementById("playBtn").addEventListener("click", function () {
+      document.getElementById("title").classList.remove("show");
+      document.getElementById("howto").classList.remove("show");
+      started = true;
+      restartGame();
+    });
+    document.getElementById("howBtn").addEventListener("click", function () { showScreen("howto"); });
+    document.getElementById("howBack").addEventListener("click", function () { showScreen("title"); });
+    document.getElementById("overTitleBtn").addEventListener("click", function () {
+      document.getElementById("gameover").classList.remove("show");
+      started = false;
+      renderLeaderboards();
+      document.getElementById("title").classList.add("show");
+    });
 
     /* ===================== THE BALLOON GAME ===================== */
     var canvas = document.getElementById("game");
@@ -503,6 +652,8 @@
     function triggerGameOver() {
       gameOver = true;
       document.getElementById("finalScore").textContent = score;
+      saveScore(score);          // remember this score
+      renderLeaderboards();      // refresh the high-score lists
       document.getElementById("gameover").classList.add("show");
       playGameOver();
     }
@@ -538,7 +689,7 @@
 
     // Press R to play again after Game Over
     window.addEventListener("keydown", function (e) {
-      if ((e.key === "r" || e.key === "R") && gameOver) restartGame();
+      if ((e.key === "r" || e.key === "R") && gameOver && started) restartGame();
     });
 
     // Press U while powered up: explode all balloons around the guy
@@ -871,6 +1022,13 @@
 
     var spawnTimer = 0;
     function loop() {
+      // Before you press PLAY, just sit on the title screen
+      if (!started) {
+        ctx.clearRect(0, 0, W, H);
+        requestAnimationFrame(loop);
+        return;
+      }
+
       // When paused, freeze everything and show a PAUSED screen
       if (paused) {
         ctx.clearRect(0, 0, W, H);
