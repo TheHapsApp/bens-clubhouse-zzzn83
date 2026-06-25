@@ -488,16 +488,39 @@
 
     /* ---- Adventure background music (an original looping chiptune) ---- */
     // 0 = a rest (no note). Numbers are note pitches in Hz.
-    // --- Song A: a bright, marching adventure tune ---
-    var leadA = [523, 659, 784, 659, 880, 784, 659, 587,
-                 523, 587, 659, 784, 1047, 0, 784, 0];
-    var bassA = [131, 131, 196, 196, 110, 110, 175, 175,
-                 131, 131, 196, 196, 175, 175, 98, 98];
-    // --- Song B: a bouncy, faster, mysterious tune (sounds quite different) ---
-    var leadB = [440, 0, 523, 587, 0, 659, 587, 523,
-                 440, 0, 392, 440, 0, 330, 0, 392];
-    var bassB = [110, 110, 0, 146, 164, 164, 0, 146,
-                 110, 110, 0, 98, 87, 87, 0, 98];
+    // A whole playlist of little songs — the music plays them one after another!
+    var songs = [
+      { // 1. bright marching adventure
+        lead: [523, 659, 784, 659, 880, 784, 659, 587, 523, 587, 659, 784, 1047, 0, 784, 0],
+        bass: [131, 131, 196, 196, 110, 110, 175, 175, 131, 131, 196, 196, 175, 175, 98, 98],
+        step: 0.19, type: "square"
+      },
+      { // 2. bouncy mysterious minor
+        lead: [440, 0, 523, 587, 0, 659, 587, 523, 440, 0, 392, 440, 0, 330, 0, 392],
+        bass: [110, 110, 0, 146, 164, 164, 0, 146, 110, 110, 0, 98, 87, 87, 0, 98],
+        step: 0.15, type: "triangle"
+      },
+      { // 3. fast happy skip
+        lead: [659, 784, 880, 784, 988, 880, 784, 659, 587, 659, 784, 880, 988, 1047, 988, 880],
+        bass: [165, 0, 220, 0, 196, 0, 247, 0, 165, 0, 220, 0, 196, 0, 131, 0],
+        step: 0.13, type: "square"
+      },
+      { // 4. slow gentle waltz
+        lead: [392, 0, 523, 0, 659, 0, 587, 0, 523, 0, 440, 0, 392, 0, 0, 0],
+        bass: [98, 98, 98, 131, 131, 131, 110, 110, 110, 87, 87, 87, 98, 98, 98, 98],
+        step: 0.22, type: "triangle"
+      },
+      { // 5. spooky low creeper
+        lead: [294, 349, 294, 392, 349, 294, 262, 294, 294, 349, 392, 440, 392, 349, 294, 0],
+        bass: [73, 73, 87, 87, 73, 73, 65, 65, 73, 73, 87, 87, 98, 98, 73, 73],
+        step: 0.17, type: "sawtooth"
+      },
+      { // 6. super-fast arcade chase
+        lead: [784, 880, 988, 1047, 988, 880, 784, 698, 784, 880, 988, 1175, 1047, 988, 880, 784],
+        bass: [196, 196, 247, 247, 220, 220, 175, 175, 196, 196, 247, 247, 262, 262, 196, 196],
+        step: 0.11, type: "square"
+      }
+    ];
     var musicBar = 0; // counts which little song we're on
     var musicOn = false;
     var musicAllowed = true; // false if you turn it off on purpose
@@ -519,16 +542,13 @@
       if (!musicOn) return;
       var ac = ensureAudio(); if (!ac) return;
 
-      // Switch songs each time: A, B, A, B, ...
-      var useB = (musicBar % 2 === 1);
-      var lead = useB ? leadB : leadA;
-      var bass = useB ? bassB : bassA;
-      var step = useB ? 0.15 : 0.19;          // Song B is a bit faster
-      var leadType = useB ? "triangle" : "square"; // and a different sound
+      // Play the next song in the playlist, then loop back to the start
+      var song = songs[musicBar % songs.length];
+      var lead = song.lead, bass = song.bass, step = song.step;
 
       var t = ac.currentTime + 0.05;
       for (var i = 0; i < lead.length; i++) {
-        playNote(lead[i], t + i * step, step * 0.9, leadType, 0.06);
+        playNote(lead[i], t + i * step, step * 0.9, song.type, 0.06);
         playNote(bass[i], t + i * step, step * 0.9, "triangle", 0.09);
       }
       musicBar++;
