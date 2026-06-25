@@ -213,7 +213,7 @@
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
-    <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
+    <p class="gamehint">🟦 Fly into your home base square to be safe from balloons! • Hold ⬇️ to flip upside down!</p>
     <p class="gamehint">🎵 Shoot the Music button (top-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall or they cost you 3 lives!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
@@ -679,6 +679,14 @@
     var isCharging = false;
     var chargeStart = 0;
     var CHARGE_MS = 350; // hold this long to make it a big bullet
+    var flipped = false; // hold the Down arrow to turn upside down
+
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { flipped = true; e.preventDefault(); }
+    });
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "ArrowDown") flipped = false;
+    });
 
     window.addEventListener("keydown", function (e) {
       if (e.key === "s" || e.key === "S") {
@@ -1211,9 +1219,15 @@
       else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
       else                  ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.moveTo(cx, gy);                 // top point
-      ctx.lineTo(cx - gw / 2, gy + gh);   // bottom left
-      ctx.lineTo(cx + gw / 2, gy + gh);   // bottom right
+      if (flipped) {
+        ctx.moveTo(cx, gy + gh);          // point at the bottom (upside down!)
+        ctx.lineTo(cx - gw / 2, gy);      // top left
+        ctx.lineTo(cx + gw / 2, gy);      // top right
+      } else {
+        ctx.moveTo(cx, gy);                 // top point
+        ctx.lineTo(cx - gw / 2, gy + gh);   // bottom left
+        ctx.lineTo(cx + gw / 2, gy + gh);   // bottom right
+      }
       ctx.closePath();
       ctx.fill();
 
@@ -1227,10 +1241,11 @@
         ctx.strokeText("Press U!", guy.x, gy - 14);
         ctx.fillText("Press U!", guy.x, gy - 14);
       }
-      // little eyes so he's a "guy"
+      // little eyes so he's a "guy" (move to the wide end, flips with him)
+      var eyeY = flipped ? (gy + gh * 0.3) : (gy + gh - gh * 0.3);
       ctx.fillStyle = "#6a2cff";
-      ctx.beginPath(); ctx.arc(cx - gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
 
       requestAnimationFrame(loop);
     }
