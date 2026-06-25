@@ -38,10 +38,15 @@
       0%, 100% { transform: scale(1) rotate(-1deg); }
       50%      { transform: scale(1.05) rotate(1deg); }
     }
+    .hint {
+      font-size: clamp(1rem, 3.5vw, 1.3rem);
+      margin-top: 8px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+    }
 
     /* The big countdown box */
     .countdown {
-      margin: 26px auto 36px;
+      margin: 24px auto 36px;
       max-width: 560px;
       background: rgba(255,255,255,0.25);
       border: 5px dashed #fff;
@@ -64,7 +69,7 @@
       50%      { transform: translateY(-12px); }
     }
 
-    /* The five info boxes */
+    /* The five type-in boxes */
     .boxes {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -76,74 +81,106 @@
       background: rgba(255,255,255,0.22);
       border: 4px solid #fff;
       border-radius: 24px;
-      padding: 22px 18px;
+      padding: 20px 18px;
       backdrop-filter: blur(4px);
-      transition: transform 0.15s ease;
     }
-    .box:hover { transform: translateY(-6px) scale(1.03); }
     .box .icon { font-size: 3rem; }
     .box .title {
-      font-size: 1.4rem;
-      margin: 8px 0 6px;
+      font-size: 1.3rem;
+      margin: 6px 0 12px;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
-    .box .value {
-      font-size: 1.5rem;
+    .box input {
+      width: 100%;
+      font-family: inherit;
+      font-size: 1.2rem;
       font-weight: bold;
-      text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+      text-align: center;
+      color: #6a2cff;
+      background: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 10px;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.12);
+    }
+    .box input:focus {
+      outline: 4px solid #ffd23f;
     }
   </style>
 </head>
 <body>
   <h1>🎂 Birthday Countdown! 🎉</h1>
+  <p class="hint">Type in the boxes below to fill in your party! ✏️</p>
 
   <div class="countdown">
     <div class="number" id="days">--</div>
-    <div class="label" id="daysLabel">days until the big day!</div>
+    <div class="label" id="daysLabel">Pick a date below to start the countdown!</div>
   </div>
 
   <div class="boxes">
     <div class="box">
-      <div class="icon">🎉</div>
-      <div class="title">Theme</div>
-      <div class="value">Tell Claude!</div>
-    </div>
-    <div class="box">
-      <div class="icon">🍕</div>
-      <div class="title">Food</div>
-      <div class="value">Tell Claude!</div>
-    </div>
-    <div class="box">
-      <div class="icon">📍</div>
-      <div class="title">Where</div>
-      <div class="value">Tell Claude!</div>
+      <div class="icon">🎈</div>
+      <div class="title">Whose Birthday</div>
+      <input id="who" type="text" placeholder="Type a name...">
     </div>
     <div class="box">
       <div class="icon">📅</div>
       <div class="title">When</div>
-      <div class="value">Tell Claude!</div>
+      <input id="when" type="date">
     </div>
     <div class="box">
-      <div class="icon">🎈</div>
-      <div class="title">Whose Birthday</div>
-      <div class="value">Tell Claude!</div>
+      <div class="icon">🎉</div>
+      <div class="title">Theme</div>
+      <input id="theme" type="text" placeholder="Type a theme...">
+    </div>
+    <div class="box">
+      <div class="icon">🍕</div>
+      <div class="title">Food</div>
+      <input id="food" type="text" placeholder="Type the food...">
+    </div>
+    <div class="box">
+      <div class="icon">📍</div>
+      <div class="title">Where</div>
+      <input id="where" type="text" placeholder="Type the place...">
     </div>
   </div>
 
   <script>
-    // CHANGE THIS to the real birthday date! Format: year, month, day
-    // NOTE: months start at 0, so January = 0, December = 11.
-    var birthday = new Date(2026, 11, 25, 0, 0, 0); // placeholder: Dec 25, 2026
+    // The text boxes we want to remember
+    var textBoxes = ["who", "theme", "food", "where", "when"];
+
+    // When the page opens, load anything that was typed before
+    textBoxes.forEach(function (id) {
+      var saved = localStorage.getItem("bday_" + id);
+      if (saved !== null) {
+        document.getElementById(id).value = saved;
+      }
+      // Save again every time someone types
+      document.getElementById(id).addEventListener("input", function () {
+        localStorage.setItem("bday_" + id, this.value);
+        if (id === "when") updateCountdown();
+      });
+    });
 
     function updateCountdown() {
-      var now = new Date();
-      var msPerDay = 1000 * 60 * 60 * 24;
-      // round UP so a party later today still shows "1"
-      var days = Math.ceil((birthday - now) / msPerDay);
-
+      var whenValue = document.getElementById("when").value;
       var numberEl = document.getElementById("days");
       var labelEl = document.getElementById("daysLabel");
+
+      if (!whenValue) {
+        numberEl.textContent = "--";
+        labelEl.textContent = "Pick a date below to start the countdown!";
+        return;
+      }
+
+      // Build the party date at midnight (local time)
+      var parts = whenValue.split("-");
+      var birthday = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0);
+
+      var now = new Date();
+      var msPerDay = 1000 * 60 * 60 * 24;
+      var days = Math.ceil((birthday - now) / msPerDay);
 
       if (days > 1) {
         numberEl.textContent = days;
