@@ -378,7 +378,9 @@
 
     function shoot(big) {
       var color = "#fff", points = 1;
-      if (!big) {
+      if (big) {
+        points = 2; // the giant charged bullet is worth 2 per balloon
+      } else {
         // Roll the dice for a rare special bullet!
         var roll = Math.random();
         if (roll < 0.04)      { color = "#b14cff"; points = 5; } // 🟣 super rare purple
