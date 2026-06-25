@@ -43,6 +43,25 @@
     /* The party stuff sits underneath the game */
     .content { position: relative; z-index: 1; }
 
+    /* Music on/off button, top-right corner */
+    #musicBtn {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 15;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #6a2cff;
+      background: #fff;
+      border: 3px solid #6a2cff;
+      border-radius: 16px;
+      padding: 8px 14px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    }
+    #musicBtn:active { transform: translateY(2px); box-shadow: none; }
+
     h1 {
       font-size: clamp(2.2rem, 8vw, 4.5rem);
       text-shadow: 4px 4px 0 rgba(0,0,0,0.18);
@@ -177,6 +196,7 @@
 </head>
 <body>
   <canvas id="game"></canvas>
+  <button id="musicBtn" type="button">🎵 Music: Off</button>
 
   <div class="content">
     <h1>🎂 Birthday Countdown! 🎉</h1>
@@ -465,6 +485,51 @@
       src.start();
     }
 
+    /* ---- Adventure background music (an original looping chiptune) ---- */
+    // 0 = a rest (no note). Numbers are note pitches in Hz.
+    var musicLead = [523, 659, 784, 659, 880, 784, 659, 587,
+                     523, 587, 659, 784, 1047, 0, 784, 0];
+    var musicBass = [131, 131, 196, 196, 110, 110, 175, 175,
+                     131, 131, 196, 196, 175, 175, 98, 98];
+    var STEP = 0.18; // seconds per note
+    var musicOn = false;
+    var musicAllowed = true; // false if you turn it off on purpose
+    var musicTimer = null;
+
+    function playNote(freq, start, dur, type, vol) {
+      var ac = audioCtx; if (!ac || !freq) return;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, start);
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.linearRampToValueAtTime(vol, start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(start); o.stop(start + dur + 0.02);
+    }
+
+    function scheduleBar() {
+      if (!musicOn) return;
+      var ac = ensureAudio(); if (!ac) return;
+      var t = ac.currentTime + 0.05;
+      for (var i = 0; i < musicLead.length; i++) {
+        playNote(musicLead[i], t + i * STEP, STEP * 0.9, "square", 0.06);
+        playNote(musicBass[i], t + i * STEP, STEP * 0.9, "triangle", 0.09);
+      }
+      musicTimer = setTimeout(scheduleBar, musicLead.length * STEP * 1000); // loop
+    }
+
+    function updateMusicBtn() {
+      document.getElementById("musicBtn").textContent = musicOn ? "🎵 Music: On" : "🎵 Music: Off";
+    }
+    function startMusic() { if (musicOn) return; musicOn = true; scheduleBar(); updateMusicBtn(); }
+    function stopMusic() { musicOn = false; if (musicTimer) clearTimeout(musicTimer); updateMusicBtn(); }
+
+    document.getElementById("musicBtn").addEventListener("click", function () {
+      if (musicOn) { stopMusic(); musicAllowed = false; }
+      else { musicAllowed = true; startMusic(); }
+    });
+
     var balloonColors = ["#ff5fa2", "#ffd23f", "#3fd0ff", "#8a5cff", "#5fff8f", "#ff8f3f"];
     var balloons = [];
     var bullets = [];
@@ -694,6 +759,7 @@
         points: points
       });
       playShoot();
+      if (musicAllowed && !musicOn) startMusic(); // start music when you start playing
     }
 
     function makeSparkles(x, y, color) {
