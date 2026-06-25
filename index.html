@@ -373,6 +373,15 @@
       return { x: W / 2, y: H / 2 };
     }
 
+    // Is the guy safe inside the WHEN box square? Balloons can't hurt him there.
+    function guyIsSafe() {
+      var box = document.getElementById("box-when");
+      if (!box) return false;
+      var r = box.getBoundingClientRect();
+      return guy.x >= r.left && guy.x <= r.right &&
+             guy.y >= r.top  && guy.y <= r.bottom;
+    }
+
     // Big burst of sparkles when the guy explodes
     function explode(x, y) {
       makeSparkles(x, y, "#fff");
@@ -491,6 +500,9 @@
       guy.x = Math.max(guy.w / 2, Math.min(W - guy.w / 2, guy.x));
       guy.y = Math.max(guy.h / 2, Math.min(H - guy.h / 2, guy.y));
 
+      // Safe while sitting in the WHEN box square
+      var guySafe = guyIsSafe();
+
       // Spawn new balloons over time
       spawnTimer++;
       if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
@@ -526,7 +538,7 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
+        if (guy.x > 0 && !guySafe && Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           var pt = respawnPoint();         // start over at the WHEN box
           guy.x = pt.x; guy.y = pt.y;
@@ -618,6 +630,15 @@
         ctx.beginPath();
         ctx.arc(guy.x, guy.y - guy.h / 2 - 12, 4 + charge * 21, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // A shiny shield ring when the guy is safe in the WHEN box
+      if (guySafe) {
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(guy.x, guy.y, guy.w / 2 + 12, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
