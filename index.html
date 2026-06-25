@@ -152,6 +152,7 @@
     <h1>🎂 Birthday Countdown! 🎉</h1>
     <p class="hint">Press a box and type in your answer! 👇</p>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
+    <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
@@ -416,7 +417,38 @@
       }
     });
 
+    // The super (giant) shot can be used 10 times, then recharges for ~40 seconds
+    var SUPER_MAX = 10;
+    var SUPER_RECHARGE_MS = 40000;
+    var superUsed = 0;
+    var superLockedUntil = 0; // a time; while now < this, no super shots
+
+    function updateSuperInfo() {
+      var el = document.getElementById("superInfo");
+      var now = Date.now();
+      if (now < superLockedUntil) {
+        var secs = Math.ceil((superLockedUntil - now) / 1000);
+        el.textContent = "💥 Super shot recharging… " + secs + "s";
+      } else {
+        if (superLockedUntil !== 0) { superLockedUntil = 0; superUsed = 0; } // recharge done!
+        el.textContent = "💥 Super shots left: " + (SUPER_MAX - superUsed);
+      }
+    }
+    setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
+
     function shoot(big) {
+      // If they tried a super shot but it's empty/recharging, fire a normal bullet
+      if (big && (Date.now() < superLockedUntil || superUsed >= SUPER_MAX)) {
+        big = false;
+      }
+      if (big) {
+        superUsed++;
+        if (superUsed >= SUPER_MAX) {
+          superLockedUntil = Date.now() + SUPER_RECHARGE_MS; // start the 40s recharge
+        }
+        updateSuperInfo();
+      }
+
       var color = "#fff", points = 1;
       if (big) {
         points = 2; // the giant charged bullet is worth 2 per balloon
