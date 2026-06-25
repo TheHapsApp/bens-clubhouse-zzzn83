@@ -703,11 +703,14 @@
     var escapingBalls = [];     // power-up balls that float away after you get bonked
 
     // Make a ball drift away from the guy (he lost his power!)
-    function loseBallFloatAway(fromX, fromY) {
+    // type is "rainbow" or "fire" so it matches the ball you grabbed
+    function loseBallFloatAway(fromX, fromY, type) {
       var dx = guy.x - fromX, dy = guy.y - fromY;
       var len = Math.sqrt(dx * dx + dy * dy) || 1;
       escapingBalls.push({
-        x: guy.x, y: guy.y, r: 32,
+        x: guy.x, y: guy.y,
+        r: (type === "fire" ? 36 : 38), // same size as the real power-up balls
+        type: type,
         vx: (dx / len) * 3.2,
         vy: (dy / len) * 3.2 - 1.5 // a little upward float too
       });
@@ -900,8 +903,8 @@
           lives--;                         // lose a life
           updateLives();
           // If you were powered up but hadn't used it, the ball floats away!
-          if (rainbowMode) { rainbowMode = false; loseBallFloatAway(bx, b.y); }
-          if (fireMode)    { fireMode = false;    loseBallFloatAway(bx, b.y); }
+          if (rainbowMode) { rainbowMode = false; loseBallFloatAway(bx, b.y, "rainbow"); }
+          if (fireMode)    { fireMode = false;    loseBallFloatAway(bx, b.y, "fire"); }
           var pt = respawnPoint();         // start over at the WHEN box
           guy.x = pt.x; guy.y = pt.y;
           mouse.x = pt.x; mouse.y = pt.y;
@@ -956,11 +959,20 @@
         var e = escapingBalls[eb];
         e.x += e.vx; e.y += e.vy;
         e.vy += 0.02; // gentle drift
-        for (var er = 6; er >= 1; er--) {
-          ctx.fillStyle = "hsl(" + ((tick * 5 + er * 55) % 360) + ", 90%, 60%)";
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.r * er / 6, 0, Math.PI * 2);
-          ctx.fill();
+        if (e.type === "fire") {
+          for (var er = 5; er >= 1; er--) {
+            ctx.fillStyle = "hsl(" + ((tick * 6 + er * 12) % 50) + ", 100%, 55%)";
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r * er / 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          for (var er2 = 6; er2 >= 1; er2--) {
+            ctx.fillStyle = "hsl(" + ((tick * 5 + er2 * 55) % 360) + ", 90%, 60%)";
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r * er2 / 6, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
         if (e.x < -80 || e.x > W + 80 || e.y < -80 || e.y > H + 80) {
           escapingBalls.splice(eb, 1); // gone off the screen
