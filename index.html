@@ -61,6 +61,24 @@
       box-shadow: 0 3px 0 rgba(0,0,0,0.2);
     }
     #musicBtn:active { transform: translateY(2px); box-shadow: none; }
+    /* Pause button, top-right corner */
+    #pauseBtn {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 15;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #6a2cff;
+      background: #fff;
+      border: 3px solid #6a2cff;
+      border-radius: 16px;
+      padding: 8px 14px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    }
+    #pauseBtn:active { transform: translateY(2px); box-shadow: none; }
     #musicBtn.jitter { animation: jitter 0.12s linear 6; }
     @keyframes jitter {
       0%   { transform: translate(0, 0) rotate(0deg); }
@@ -205,6 +223,7 @@
 <body>
   <canvas id="game"></canvas>
   <button id="musicBtn" type="button">🎵 Music: Off</button>
+  <button id="pauseBtn" type="button">⏸ Pause</button>
 
   <div class="content">
     <h1>🎈 Balloon Popper! 💥</h1>
@@ -432,6 +451,33 @@
     }
     document.getElementById("musicBtn").addEventListener("click", toggleMusic);
 
+    // ---- Pause the whole game + music ----
+    var paused = false;
+    var pauseStart = 0;
+    var pauseMusicWasOn = false;
+    function updatePauseBtn() {
+      document.getElementById("pauseBtn").textContent = paused ? "▶ Play" : "⏸ Pause";
+    }
+    function togglePause() {
+      paused = !paused;
+      updatePauseBtn();
+      if (paused) {
+        pauseStart = Date.now();
+        pauseMusicWasOn = musicOn;
+        if (musicOn) stopMusic();
+      } else {
+        // shift all the time-based timers forward by however long we paused
+        var delta = Date.now() - pauseStart;
+        fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta;
+        dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
+        if (pauseMusicWasOn) startMusic();
+      }
+    }
+    document.getElementById("pauseBtn").addEventListener("click", togglePause);
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "p" || e.key === "P") togglePause();
+    });
+
     // Make the Music button shake for a moment when a bullet hits it
     function jitterButton() {
       var btn = document.getElementById("musicBtn");
@@ -498,7 +544,7 @@
     // Press U while powered up: explode all balloons around the guy
     window.addEventListener("keydown", function (e) {
       if (e.key !== "u" && e.key !== "U") return;
-      if (gameOver) return;
+      if (gameOver || paused) return;
       // No power? The guy jitters + turns yellow trying to transform.
       // Holding U too long overheats and EXPLODES! (handled in the game loop)
       if (!rainbowMode && !fireMode) {
@@ -737,7 +783,7 @@
     window.addEventListener("keydown", function (e) {
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
-        if (e.repeat) return;          // ignore the keyboard auto-repeats
+        if (e.repeat || paused) return; // ignore auto-repeats and paused
         isCharging = true;
         chargeStart = performance.now();
       }
@@ -771,7 +817,7 @@
     setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
 
     function shoot(big) {
-      if (gameOver) return; // no shooting once the game is over
+      if (gameOver || paused) return; // no shooting when over or paused
       // If they tried a super shot but it's empty/recharging, fire a normal bullet
       if (big && (Date.now() < superLockedUntil || superUsed >= SUPER_MAX)) {
         big = false;
@@ -823,6 +869,21 @@
 
     var spawnTimer = 0;
     function loop() {
+      // When paused, freeze everything and show a PAUSED screen
+      if (paused) {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.font = "bold 64px 'Comic Sans MS', sans-serif";
+        ctx.fillText("⏸ PAUSED", W / 2, H / 2);
+        ctx.font = "bold 24px 'Comic Sans MS', sans-serif";
+        ctx.fillText("Press P or the Play button to keep going!", W / 2, H / 2 + 50);
+        requestAnimationFrame(loop);
+        return;
+      }
+
       ctx.clearRect(0, 0, W, H);
       tick++;
 
