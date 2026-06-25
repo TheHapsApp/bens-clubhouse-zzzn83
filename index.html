@@ -85,6 +85,36 @@
       100% { transform: rotate(720deg) scale(1); }
     }
 
+    /* Game Over screen */
+    #gameover {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;            /* shown only when you run out of lives */
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      text-align: center;
+      padding: 24px;
+    }
+    #gameover.show { display: flex; }
+    #gameover .go-title {
+      font-size: clamp(2.5rem, 12vw, 6rem);
+      text-shadow: 4px 4px 0 rgba(255,0,80,0.5);
+      animation: pop 1.2s ease-in-out infinite;
+    }
+    #gameover .go-score { font-size: clamp(1.4rem, 6vw, 2.4rem); }
+    #gameover .go-again {
+      font-size: clamp(1.2rem, 5vw, 1.8rem);
+      background: rgba(255,255,255,0.2);
+      border: 3px dashed #fff;
+      border-radius: 18px;
+      padding: 12px 22px;
+    }
+
     /* The big countdown box */
     .countdown {
       margin: 22px auto 36px;
@@ -153,6 +183,7 @@
     <p class="hint">Press a box and type in your answer! 👇</p>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
+    <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
@@ -192,6 +223,13 @@
         <div class="value empty" id="where">Press to type!</div>
       </div>
     </div>
+  </div>
+
+  <!-- Game Over screen -->
+  <div id="gameover">
+    <div class="go-title">💀 GAME OVER 💀</div>
+    <div class="go-score">Final Score: <span id="finalScore">0</span></div>
+    <div class="go-again">Press R to play again! 🔁</div>
   </div>
 
   <!-- Hidden date picker that the When box uses -->
@@ -377,12 +415,64 @@
       o.start(); o.stop(ac.currentTime + 0.17);
     }
 
+    // sad descending chiptune jingle when the game ends
+    function playGameOver() {
+      var ac = ensureAudio(); if (!ac) return;
+      var seq = [ [523,0.18],[440,0.18],[392,0.18],[349,0.18],[330,0.22],[262,0.45] ];
+      var t = ac.currentTime + 0.02;
+      seq.forEach(function (n) {
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = "square";
+        o.frequency.setValueAtTime(n[0], t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + n[1]);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t + n[1] + 0.02);
+        t += n[1];
+      });
+    }
+
     var balloonColors = ["#ff5fa2", "#ffd23f", "#3fd0ff", "#8a5cff", "#5fff8f", "#ff8f3f"];
     var balloons = [];
     var bullets = [];
     var sparkles = [];
     var floaters = []; // little "+3" / "+5" point popups
     var score = 0;
+    var lives = 12;
+    var gameOver = false;
+
+    function updateLives() {
+      document.getElementById("livesInfo").textContent = "❤️ Lives: " + lives;
+    }
+
+    function triggerGameOver() {
+      gameOver = true;
+      document.getElementById("finalScore").textContent = score;
+      document.getElementById("gameover").classList.add("show");
+      playGameOver();
+    }
+
+    function restartGame() {
+      gameOver = false;
+      lives = 12;
+      score = 0;
+      balloons.length = 0;
+      bullets.length = 0;
+      superUsed = 0;
+      superLockedUntil = 0;
+      for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
+      var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
+      updateLives();
+      updateSuperInfo();
+      scoreNum.textContent = "0";
+      document.getElementById("gameover").classList.remove("show");
+    }
+
+    // Press R to play again after Game Over
+    window.addEventListener("keydown", function (e) {
+      if ((e.key === "r" || e.key === "R") && gameOver) restartGame();
+    });
 
     function makeFloater(x, y, text, color) {
       floaters.push({ x: x, y: y, text: text, color: color, life: 50 });
@@ -497,6 +587,7 @@
     setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
 
     function shoot(big) {
+      if (gameOver) return; // no shooting once the game is over
       // If they tried a super shot but it's empty/recharging, fire a normal bullet
       if (big && (Date.now() < superLockedUntil || superUsed >= SUPER_MAX)) {
         big = false;
@@ -555,9 +646,11 @@
       // Safe while sitting in the WHEN box square
       var guySafe = guyIsSafe();
 
-      // Spawn new balloons over time
-      spawnTimer++;
-      if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
+      // Spawn new balloons over time (paused once the game is over)
+      if (!gameOver) {
+        spawnTimer++;
+        if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
+      }
 
       // Draw + move balloons
       for (var i = balloons.length - 1; i >= 0; i--) {
@@ -590,14 +683,17 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && !guySafe && Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
+        if (guy.x > 0 && !guySafe && !gameOver &&
+            Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
-
+          lives--;                         // lose a life
+          updateLives();
           var pt = respawnPoint();         // start over at the WHEN box
           guy.x = pt.x; guy.y = pt.y;
           mouse.x = pt.x; mouse.y = pt.y;
           balloons.splice(i, 1);
+          if (lives <= 0) triggerGameOver();
           continue;
         }
 
