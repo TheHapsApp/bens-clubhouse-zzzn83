@@ -205,7 +205,7 @@
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
-    <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT — every pop is worth 3 points!</p>
+    <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
@@ -1004,7 +1004,7 @@
           var fdy = bu.y - fireBall.y;
           if (Math.sqrt(fdx * fdx + fdy * fdy) < fireBall.r + bu.r) {
             fireMode = true;
-            fireUntil = Date.now() + 12000; // lasts 12 seconds
+            fireUntil = Date.now() + 22000; // giant mode lasts 22 seconds
             fireBall = null;
             fireCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
