@@ -759,12 +759,22 @@
       }
     }, { passive: true });
 
-    // Wall platforms you can hide above to block danger balloons
+    // Walls + squares. Brown = safe (hide here). Red = DON'T TOUCH (kaboom!)
     function getWalls() {
       return [
-        { x: W * 0.08, y: H * 0.55, w: W * 0.26, h: 20 },
-        { x: W * 0.66, y: H * 0.42, w: W * 0.26, h: 20 },
-        { x: W * 0.39, y: H * 0.70, w: W * 0.22, h: 20 }
+        // brown walls (safe — block the spikes)
+        { x: W * 0.06, y: H * 0.55, w: W * 0.22, h: 20, red: false },
+        { x: W * 0.72, y: H * 0.44, w: W * 0.22, h: 20, red: false },
+        { x: W * 0.40, y: H * 0.72, w: W * 0.20, h: 20, red: false },
+        // brown squares (safe)
+        { x: W * 0.30, y: H * 0.34, w: 60, h: 60, red: false },
+        { x: W * 0.60, y: H * 0.60, w: 60, h: 60, red: false },
+        // red walls (deadly — can't touch!)
+        { x: W * 0.62, y: H * 0.52, w: W * 0.16, h: 18, red: true },
+        { x: W * 0.10, y: H * 0.30, w: W * 0.15, h: 18, red: true },
+        // red squares (deadly)
+        { x: W * 0.80, y: H * 0.66, w: 55, h: 55, red: true },
+        { x: W * 0.20, y: H * 0.68, w: 55, h: 55, red: true }
       ];
     }
     // Does a circle (cx,cy,r) overlap a rectangle?
@@ -1118,6 +1128,21 @@
       var gw = guy.w * sizeMul;
       var gh = guy.h * sizeMul;
 
+      // Touching a RED block = KABOOM and start over!
+      if (guy.x > 0 && !gameOver && !ultimateActive) {
+        var redBlocks = getWalls();
+        for (var rbk = 0; rbk < redBlocks.length; rbk++) {
+          if (redBlocks[rbk].red && circleRectOverlap(guy.x, guy.y, gw / 2, redBlocks[rbk])) {
+            explode(guy.x, guy.y);
+            screenExplode();
+            score = 0;
+            scoreNum.textContent = "0";
+            triggerGameOver();
+            break;
+          }
+        }
+      }
+
       // Spawn new balloons over time (paused once the game is over)
       if (!gameOver) {
         spawnTimer++;
@@ -1178,18 +1203,34 @@
       // ---- Walls + the danger wave ----
       var walls = getWalls();
       walls.forEach(function (wl) {
-        ctx.fillStyle = "#5a3a1a";                 // brown brick
-        ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
-        ctx.fillStyle = "#caa06a";                 // lighter top edge
-        ctx.fillRect(wl.x, wl.y, wl.w, 6);
-        ctx.strokeStyle = "#2b1c0c";               // dark outline
-        ctx.lineWidth = 4;
-        ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
-        // brick lines so it clearly looks like a wall
-        ctx.strokeStyle = "rgba(0,0,0,0.3)";
-        ctx.lineWidth = 2;
-        for (var bx = wl.x + 24; bx < wl.x + wl.w; bx += 24) {
-          ctx.beginPath(); ctx.moveTo(bx, wl.y); ctx.lineTo(bx, wl.y + wl.h); ctx.stroke();
+        if (wl.red) {
+          ctx.fillStyle = (tick % 16 < 8) ? "#e01010" : "#b00000"; // glowing red
+          ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
+          // hazard stripes so it screams "don't touch!"
+          ctx.strokeStyle = "rgba(255,255,255,0.55)";
+          ctx.lineWidth = 3;
+          for (var hx = wl.x + 12; hx < wl.x + wl.w + wl.h; hx += 16) {
+            ctx.beginPath();
+            ctx.moveTo(Math.min(hx, wl.x + wl.w), wl.y + Math.max(0, hx - (wl.x + wl.w)));
+            ctx.lineTo(wl.x + Math.max(0, hx - wl.h), wl.y + Math.min(wl.h, hx - wl.x));
+            ctx.stroke();
+          }
+        } else {
+          ctx.fillStyle = "#5a3a1a";                 // brown brick
+          ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
+          ctx.fillStyle = "#caa06a";                 // lighter top edge
+          ctx.fillRect(wl.x, wl.y, wl.w, 6);
+          ctx.strokeStyle = "#2b1c0c";               // dark outline
+          ctx.lineWidth = 4;
+          ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
+          ctx.strokeStyle = "rgba(0,0,0,0.3)";       // brick lines
+          ctx.lineWidth = 2;
+          for (var bx = wl.x + 24; bx < wl.x + wl.w; bx += 24) {
+            ctx.beginPath(); ctx.moveTo(bx, wl.y); ctx.lineTo(bx, wl.y + wl.h); ctx.stroke();
+          }
         }
       });
 
