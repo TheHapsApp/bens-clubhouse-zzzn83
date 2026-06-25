@@ -326,6 +326,44 @@
     window.addEventListener("resize", resize);
     resize();
 
+    /* ---- Sound effects (made by the browser, no files needed) ---- */
+    var audioCtx = null;
+    function ensureAudio() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { audioCtx = null; }
+      }
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+    // "pew!" when you shoot
+    function playShoot() {
+      var ac = ensureAudio(); if (!ac) return;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = "square";
+      o.frequency.setValueAtTime(700, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.12);
+      g.gain.setValueAtTime(0.15, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+      o.connect(g); g.connect(ac.destination);
+      o.start(); o.stop(ac.currentTime + 0.13);
+    }
+    // "POP!" when a balloon bursts (a quick noise burst)
+    function playPop() {
+      var ac = ensureAudio(); if (!ac) return;
+      var dur = 0.12, len = Math.floor(ac.sampleRate * dur);
+      var buffer = ac.createBuffer(1, len, ac.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / len); // fades out fast
+      }
+      var src = ac.createBufferSource(); src.buffer = buffer;
+      var filt = ac.createBiquadFilter(); filt.type = "bandpass"; filt.frequency.value = 1100;
+      var g = ac.createGain(); g.gain.value = 0.5;
+      src.connect(filt); filt.connect(g); g.connect(ac.destination);
+      src.start();
+    }
+
     var balloonColors = ["#ff5fa2", "#ffd23f", "#3fd0ff", "#8a5cff", "#5fff8f", "#ff8f3f"];
     var balloons = [];
     var bullets = [];
@@ -476,6 +514,7 @@
         color: color,
         points: points
       });
+      playShoot();
     }
 
     function makeSparkles(x, y, color) {
@@ -575,6 +614,7 @@
           var dy = bu.y - bal.y;
           if (Math.sqrt(dx * dx + dy * dy) < bal.r + bu.r) {
             makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
+            playPop();
             // Always show how many points this pop was worth
             var fColor = bu.points === 1 ? "#6a2cff" : bu.color;
             makeFloater(bal.drawX || bal.x, bal.y, "+" + bu.points, fColor);
