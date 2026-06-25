@@ -199,52 +199,14 @@
   <button id="musicBtn" type="button">🎵 Music: Off</button>
 
   <div class="content">
-    <h1>🎂 Birthday Countdown! 🎉</h1>
-    <p class="hint">Press a box and type in your answer! 👇</p>
+    <h1>🎈 Balloon Blaster! 💥</h1>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
+    <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
-
-    <div class="countdown">
-      <div class="number" id="days">--</div>
-      <div class="label" id="daysLabel">Press the When box to start the countdown!</div>
-    </div>
-
-    <div class="boxes">
-      <div class="box" id="box-who">
-        <div class="icon">🎈</div>
-        <div class="title">Whose Birthday</div>
-        <div class="value empty" id="who">Press to type!</div>
-      </div>
-      <div class="box" id="box-when">
-        <div class="icon">📅</div>
-        <div class="title">When</div>
-        <div class="value empty" id="when">Press to pick a day!</div>
-      </div>
-      <div class="box" id="box-time">
-        <div class="icon">⏰</div>
-        <div class="title">What Time</div>
-        <div class="value empty" id="time">Press to type!</div>
-      </div>
-      <div class="box" id="box-theme">
-        <div class="icon">🎉</div>
-        <div class="title">Theme</div>
-        <div class="value empty" id="theme">Press to type!</div>
-      </div>
-      <div class="box" id="box-food">
-        <div class="icon">🍕</div>
-        <div class="title">Food</div>
-        <div class="value empty" id="food">Press to type!</div>
-      </div>
-      <div class="box" id="box-where">
-        <div class="icon">📍</div>
-        <div class="title">Where</div>
-        <div class="value empty" id="where">Press to type!</div>
-      </div>
-    </div>
   </div>
 
   <!-- Game Over screen -->
@@ -254,125 +216,7 @@
     <div class="go-again">Press R to play again! 🔁</div>
   </div>
 
-  <!-- Hidden date picker that the When box uses -->
-  <input type="date" id="datePicker" style="position:absolute; opacity:0; pointer-events:none;">
-
   <script>
-    /* ===================== THE PARTY BOXES ===================== */
-    var questions = {
-      who:   "Whose birthday is it? Type a name:",
-      time:  "What time does the party start? (like 2:00 PM)",
-      theme: "What is the theme for the birthday?",
-      food:  "What food will there be?",
-      where: "Where is the party going to be?"
-    };
-
-    function showValue(id, text) {
-      var el = document.getElementById(id);
-      if (text && text.length > 0) {
-        el.textContent = text;
-        el.classList.remove("empty");
-      } else {
-        el.textContent = (id === "when") ? "Press to pick a day!" : "Press to type!";
-        el.classList.add("empty");
-      }
-    }
-
-    Object.keys(questions).forEach(function (id) {
-      showValue(id, localStorage.getItem("bday_" + id));
-      document.getElementById("box-" + id).addEventListener("click", function () {
-        var current = localStorage.getItem("bday_" + id) || "";
-        var answer = prompt(questions[id], current);
-        if (answer !== null) {
-          localStorage.setItem("bday_" + id, answer);
-          showValue(id, answer);
-        }
-      });
-    });
-
-    var datePicker = document.getElementById("datePicker");
-    showValue("when", localStorage.getItem("bday_when_pretty"));
-    document.getElementById("box-when").addEventListener("click", function () {
-      datePicker.value = localStorage.getItem("bday_when_raw") || "";
-      if (datePicker.showPicker) { datePicker.showPicker(); }
-      else { datePicker.focus(); datePicker.click(); }
-    });
-    datePicker.addEventListener("change", function () {
-      var raw = datePicker.value;
-      localStorage.setItem("bday_when_raw", raw);
-      var pretty = "";
-      if (raw) {
-        var p = raw.split("-");
-        var d = new Date(p[0], p[1] - 1, p[2]);
-        pretty = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-      }
-      localStorage.setItem("bday_when_pretty", pretty);
-      showValue("when", pretty);
-      updateCountdown();
-    });
-
-    // Try to read a time like "2:00 PM", "2pm", or "14:30" from the time box.
-    // Returns { h: 0-23, m: 0-59 } or null if we can't understand it.
-    function parseTime(text) {
-      if (!text) return null;
-      var m = text.match(/(\d{1,2})\s*(?::\s*(\d{2}))?\s*(am|pm)?/i);
-      if (!m) return null;
-      var h = parseInt(m[1], 10);
-      var min = m[2] ? parseInt(m[2], 10) : 0;
-      var ampm = m[3] ? m[3].toLowerCase() : "";
-      if (ampm === "pm" && h < 12) h += 12;
-      if (ampm === "am" && h === 12) h = 0;
-      if (h > 23 || min > 59) return null;
-      return { h: h, m: min };
-    }
-
-    function updateCountdown() {
-      var raw = localStorage.getItem("bday_when_raw");
-      var numberEl = document.getElementById("days");
-      var labelEl = document.getElementById("daysLabel");
-      if (!raw) {
-        numberEl.textContent = "--";
-        labelEl.textContent = "Press the When box to start the countdown!";
-        return;
-      }
-      var p = raw.split("-");
-      var birthday = new Date(p[0], p[1] - 1, p[2], 0, 0, 0);
-      var now = new Date();
-      var days = Math.ceil((birthday - now) / (1000 * 60 * 60 * 24));
-
-      if (days > 1)        { numberEl.textContent = days; labelEl.textContent = "days until the big day!"; }
-      else if (days === 1) { numberEl.textContent = "1"; labelEl.textContent = "day to go! Almost here!"; }
-      else if (days === 0) {
-        // It's TODAY! Count down the hours and minutes until party time.
-        var t = parseTime(localStorage.getItem("bday_time"));
-        if (t) {
-          var party = new Date(p[0], p[1] - 1, p[2], t.h, t.m, 0);
-          var diff = party - now;
-          if (diff > 0) {
-            var totalMin = Math.floor(diff / (1000 * 60));
-            var hrs = Math.floor(totalMin / 60);
-            var mins = totalMin % 60;
-            if (hrs > 0) {
-              numberEl.textContent = hrs + "h " + mins + "m";
-              labelEl.textContent = "until the party starts! 🎉";
-            } else {
-              numberEl.textContent = mins + (mins === 1 ? " minute" : " minutes");
-              labelEl.textContent = "until the party starts! 🎉";
-            }
-          } else {
-            numberEl.textContent = "🎉";
-            labelEl.textContent = "IT'S PARTY TIME! HAPPY BIRTHDAY!";
-          }
-        } else {
-          // No time typed in yet — just celebrate the day
-          numberEl.textContent = "🎉";
-          labelEl.textContent = "IT'S TODAY! HAPPY BIRTHDAY!";
-        }
-      }
-      else { numberEl.textContent = "🎂"; labelEl.textContent = "Hope it was a great party!"; }
-    }
-    updateCountdown();
-    setInterval(updateCountdown, 1000); // tick every second so the minutes count down
 
 
     /* ===================== THE BALLOON GAME ===================== */
@@ -662,23 +506,22 @@
       }
     }, { passive: true });
 
-    // Where the guy respawns: the middle of the 📅 emoji in the WHEN box
+    // The home base square: a safe spot near the bottom-middle of the screen
+    function getBase() {
+      var w = 130, h = 100;
+      return { x: W / 2 - w / 2, y: H - h - 24, w: w, h: h };
+    }
+    // Where the guy respawns: the middle of the home base
     function respawnPoint() {
-      var icon = document.querySelector("#box-when .icon");
-      if (icon) {
-        var r = icon.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      }
-      return { x: W / 2, y: H / 2 };
+      var b = getBase();
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
     }
 
-    // Is the guy safe inside the WHEN box square? Balloons can't hurt him there.
+    // Is the guy safe inside the home base square? Balloons can't hurt him there.
     function guyIsSafe() {
-      var box = document.getElementById("box-when");
-      if (!box) return false;
-      var r = box.getBoundingClientRect();
-      return guy.x >= r.left && guy.x <= r.right &&
-             guy.y >= r.top  && guy.y <= r.bottom;
+      var b = getBase();
+      return guy.x >= b.x && guy.x <= b.x + b.w &&
+             guy.y >= b.y && guy.y <= b.y + b.h;
     }
 
     // Big burst of sparkles when the guy explodes
@@ -845,6 +688,20 @@
     function loop() {
       ctx.clearRect(0, 0, W, H);
       tick++;
+
+      // Draw the home base safe square
+      var base = getBase();
+      ctx.fillStyle = "rgba(63, 208, 255, 0.25)";
+      ctx.fillRect(base.x, base.y, base.w, base.h);
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 8]);
+      ctx.strokeRect(base.x, base.y, base.w, base.h);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.textAlign = "center";
+      ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
+      ctx.fillText("🏠 SAFE", base.x + base.w / 2, base.y + base.h / 2 + 6);
 
       // Fire mode wears off after its timer
       if (fireMode && Date.now() > fireUntil) fireMode = false;
