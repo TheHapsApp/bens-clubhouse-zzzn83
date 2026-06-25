@@ -215,7 +215,7 @@
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <p class="gamehint">🎵 Shoot the Music button (top-right) with a bullet to turn music on/off!</p>
-    <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall or they cost you 3 lives!</p>
+    <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
   </div>
 
@@ -614,6 +614,15 @@
       makeSparkles(x, y, "#ff5fa2");
     }
 
+    // The WHOLE screen blows up when a spike gets you!
+    function screenExplode() {
+      for (var i = 0; i < 50; i++) {
+        makeSparkles(Math.random() * W, Math.random() * H,
+                     balloonColors[Math.floor(Math.random() * balloonColors.length)]);
+      }
+      playBoom();
+    }
+
     function spawnBalloon() {
       balloons.push({
         x: 30 + Math.random() * (W - 60),
@@ -1005,22 +1014,17 @@
           continue;
         }
 
-        // Did it hit the guy? Lose 3 lives!
+        // Did it hit the guy? The WHOLE SCREEN blows up and you start over!
         if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive) {
           var ddx = d.x - guy.x, ddy = d.y - guy.y;
           if (Math.sqrt(ddx * ddx + ddy * ddy) < d.r + gw / 2) {
             explode(guy.x, guy.y);
-            playBonk();
-            dangerHitThisWave = true; // no dodge bonus this wave
-            lives -= 3;
-            if (lives < 0) lives = 0;
-            updateLives();
-            if (rainbowMode) { rainbowMode = false; loseBallFloatAway(d.x, d.y, "rainbow"); }
-            if (fireMode)    { fireMode = false;    loseBallFloatAway(d.x, d.y, "fire"); }
-            var pt2 = respawnPoint();
-            guy.x = pt2.x; guy.y = pt2.y; mouse.x = pt2.x; mouse.y = pt2.y;
-            dangerBalloons.splice(di, 1);
-            if (lives <= 0) triggerGameOver();
+            screenExplode();          // KABOOM — the whole screen!
+            dangerHitThisWave = true;
+            score = 0;                // your score goes all the way down
+            scoreNum.textContent = "0";
+            dangerBalloons.length = 0;
+            triggerGameOver();        // start over
             continue;
           }
         }
