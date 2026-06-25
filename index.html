@@ -477,7 +477,14 @@
 
     // Press U while powered up: explode all balloons around the guy
     window.addEventListener("keydown", function (e) {
-      if ((e.key === "u" || e.key === "U") && rainbowMode && !gameOver) {
+      if (e.key !== "u" && e.key !== "U") return;
+      if (gameOver) return;
+      // No ultimate power? The guy jitters and turns yellow, trying to transform!
+      if (!rainbowMode && !fireMode) {
+        tryingUntil = Date.now() + 600;
+        return;
+      }
+      if (rainbowMode) {
         var radius = 320;
         var popped = 0;
         for (var k = balloons.length - 1; k >= 0; k--) {
@@ -591,6 +598,7 @@
     var rainbowCooldown = 500;  // frames until the next ball appears
     var tick = 0;               // counts frames, used for rainbow colors
     var escapingBalls = [];     // power-up balls that float away after you get bonked
+    var tryingUntil = 0;        // guy is "trying to transform" until this time (no power)
 
     // Make a ball drift away from the guy (he lost his power!)
     // type is "rainbow" or "fire" so it matches the ball you grabbed
@@ -618,7 +626,7 @@
 
     // ---- Danger wave: un-poppable balloons you must hide from ----
     var dangerBalloons = [];
-    var dangerCooldown = 700;   // frames until the next danger wave
+    var dangerCooldown = 200;   // frames until the first danger wave (comes quick!)
     var dangerWarnUntil = 0;    // show the warning text until this time
 
     function spawnDangerWave() {
@@ -840,12 +848,20 @@
 
       // ---- Walls + the danger wave ----
       var walls = getWalls();
-      ctx.fillStyle = "#7a5230";
       walls.forEach(function (wl) {
+        ctx.fillStyle = "#5a3a1a";                 // brown brick
         ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
-        ctx.strokeStyle = "rgba(0,0,0,0.35)";
-        ctx.lineWidth = 3;
+        ctx.fillStyle = "#caa06a";                 // lighter top edge
+        ctx.fillRect(wl.x, wl.y, wl.w, 6);
+        ctx.strokeStyle = "#2b1c0c";               // dark outline
+        ctx.lineWidth = 4;
         ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
+        // brick lines so it clearly looks like a wall
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.lineWidth = 2;
+        for (var bx = wl.x + 24; bx < wl.x + wl.w; bx += 24) {
+          ctx.beginPath(); ctx.moveTo(bx, wl.y); ctx.lineTo(bx, wl.y + wl.h); ctx.stroke();
+        }
       });
 
       if (!gameOver) {
@@ -860,15 +876,25 @@
         var d = dangerBalloons[di];
         d.y -= d.speed;
 
-        // draw a scary spiky danger balloon
-        ctx.fillStyle = "#3a0d0d";
+        // draw a scary SPIKY danger balloon
+        ctx.fillStyle = "#cc1111";
+        ctx.strokeStyle = "#3a0000";
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.ellipse(d.x, d.y, d.r * 0.8, d.r, 0, 0, Math.PI * 2);
+        var spikes = 10;
+        for (var sp2 = 0; sp2 < spikes * 2; sp2++) {
+          var ang = (sp2 / (spikes * 2)) * Math.PI * 2;
+          var rad = (sp2 % 2 === 0) ? d.r + 8 : d.r; // out, in, out, in = spikes
+          var px = d.x + Math.cos(ang) * rad;
+          var py = d.y + Math.sin(ang) * rad;
+          if (sp2 === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = "#ff2a2a";
-        ctx.lineWidth = 3;
         ctx.stroke();
-        ctx.beginPath(); // angry X face
+        ctx.strokeStyle = "#fff"; // angry X face
+        ctx.lineWidth = 3;
+        ctx.beginPath();
         ctx.moveTo(d.x - 7, d.y - 6); ctx.lineTo(d.x + 7, d.y + 3);
         ctx.moveTo(d.x + 7, d.y - 6); ctx.lineTo(d.x - 7, d.y + 3);
         ctx.stroke();
@@ -1108,16 +1134,21 @@
         ctx.stroke();
       }
 
-      // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
-      var gy = guy.y - gh / 2; // top of the triangle
-      // Fire = yellow, rainbow = rainbow, otherwise white
+      // Pressing U with no power: the guy jitters + turns yellow, trying to transform
+      var trying = Date.now() < tryingUntil;
+      var jx = trying ? (Math.random() * 12 - 6) : 0;
+      var jy = trying ? (Math.random() * 12 - 6) : 0;
+      var cx = guy.x + jx;                 // jittered draw position
+      var gy = guy.y - gh / 2 + jy;        // top of the triangle
+      // Fire = yellow, trying = yellow, rainbow = rainbow, otherwise white
       if (fireMode)         ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
+      else if (trying)      ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // trying = yellow
       else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
       else                  ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.moveTo(guy.x, gy);                 // top point
-      ctx.lineTo(guy.x - gw / 2, gy + gh);   // bottom left
-      ctx.lineTo(guy.x + gw / 2, gy + gh);   // bottom right
+      ctx.moveTo(cx, gy);                 // top point
+      ctx.lineTo(cx - gw / 2, gy + gh);   // bottom left
+      ctx.lineTo(cx + gw / 2, gy + gh);   // bottom right
       ctx.closePath();
       ctx.fill();
 
@@ -1133,8 +1164,8 @@
       }
       // little eyes so he's a "guy"
       ctx.fillStyle = "#6a2cff";
-      ctx.beginPath(); ctx.arc(guy.x - gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(guy.x + gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
 
       requestAnimationFrame(loop);
     }
