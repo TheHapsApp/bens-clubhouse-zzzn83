@@ -856,6 +856,8 @@
         color: color,
         points: points
       });
+      // RECOIL! the blast kicks you back the opposite way the bullet went
+      guy.y += -dir * (big ? 90 : 55);
       playShoot();
     }
 
