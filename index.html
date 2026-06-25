@@ -571,6 +571,24 @@
       return (dx * dx + dy * dy) < r * r;
     }
 
+    // Bounce a moving ball {x,y,r,vx,vy} off the wall platforms
+    function bounceBallOffWalls(ball, walls) {
+      for (var i = 0; i < walls.length; i++) {
+        var w = walls[i];
+        if (!circleRectOverlap(ball.x, ball.y, ball.r, w)) continue;
+        var nx = Math.max(w.x, Math.min(ball.x, w.x + w.w));
+        var ny = Math.max(w.y, Math.min(ball.y, w.y + w.h));
+        var dx = ball.x - nx, dy = ball.y - ny;
+        if (Math.abs(dx) > Math.abs(dy)) {  // hit a side
+          ball.vx = (dx >= 0 ? 1 : -1) * Math.abs(ball.vx);
+          ball.x = nx + (dx >= 0 ? ball.r : -ball.r);
+        } else {                            // hit top or bottom
+          ball.vy = (dy >= 0 ? 1 : -1) * Math.abs(ball.vy);
+          ball.y = ny + (dy >= 0 ? ball.r : -ball.r);
+        }
+      }
+    }
+
     // The home base square: a safe spot near the bottom-middle of the screen
     function getBase() {
       var w = 130, h = 100;
@@ -1054,6 +1072,7 @@
         rb.x += rb.vx; rb.y += rb.vy;
         if (rb.x < rb.r || rb.x > W - rb.r) rb.vx *= -1;        // bounce off edges
         if (rb.y < rb.r || rb.y > H - rb.r) rb.vy *= -1;
+        bounceBallOffWalls(rb, walls);                          // bounce off the walls too
         // draw rainbow rings
         for (var ring = 6; ring >= 1; ring--) {
           ctx.fillStyle = "hsl(" + ((tick * 5 + ring * 55) % 360) + ", 90%, 60%)";
@@ -1073,6 +1092,7 @@
         fb.x += fb.vx; fb.y += fb.vy;
         if (fb.x < fb.r || fb.x > W - fb.r) fb.vx *= -1;
         if (fb.y < fb.r || fb.y > H - fb.r) fb.vy *= -1;
+        bounceBallOffWalls(fb, walls);                          // bounce off the walls too
         // draw fiery rings (reds, oranges, yellows = hue 0 to 50)
         for (var fr = 5; fr >= 1; fr--) {
           ctx.fillStyle = "hsl(" + ((tick * 6 + fr * 12) % 50) + ", 100%, 55%)";
