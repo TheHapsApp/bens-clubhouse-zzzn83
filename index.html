@@ -481,6 +481,7 @@
       dangerPending = false;
       dangerWaveActive = false;
       ultimateActive = false;
+      uHolding = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -498,9 +499,11 @@
     window.addEventListener("keydown", function (e) {
       if (e.key !== "u" && e.key !== "U") return;
       if (gameOver) return;
-      // No ultimate power? The guy jitters and turns yellow, trying to transform!
+      // No power? The guy jitters + turns yellow trying to transform.
+      // Holding U too long overheats and EXPLODES! (handled in the game loop)
       if (!rainbowMode && !fireMode) {
-        tryingUntil = Date.now() + 600;
+        if (!e.repeat) { uHolding = true; uHoldStart = Date.now(); }
+        tryingUntil = Date.now() + 300;
         return;
       }
       if (rainbowMode) {
@@ -523,6 +526,10 @@
         explode(guy.x, guy.y);
         rainbowMode = false; // power used up
       }
+    });
+    // Letting go of U stops the overheat
+    window.addEventListener("keyup", function (e) {
+      if (e.key === "u" || e.key === "U") uHolding = false;
     });
 
     function makeFloater(x, y, text, color) {
@@ -645,6 +652,9 @@
     var tick = 0;               // counts frames, used for rainbow colors
     var escapingBalls = [];     // power-up balls that float away after you get bonked
     var tryingUntil = 0;        // guy is "trying to transform" until this time (no power)
+    var uHolding = false;       // is the U key being held with no power?
+    var uHoldStart = 0;         // when the U hold started
+    var U_OVERHEAT_MS = 1500;   // hold U longer than this with no power = BOOM!
 
     // Make a ball drift away from the guy (he lost his power!)
     // type is "rainbow" or "fire" so it matches the ball you grabbed
@@ -832,6 +842,23 @@
 
       // Fire mode wears off after its timer
       if (fireMode && Date.now() > fireUntil) fireMode = false;
+
+      // Holding U with no power OVERHEATS — too long and you explode + start over!
+      if (uHolding && !gameOver) {
+        if (rainbowMode || fireMode) {
+          uHolding = false; // got a power, never mind
+        } else {
+          tryingUntil = Date.now() + 100; // keep jittering yellow while held
+          if (Date.now() - uHoldStart > U_OVERHEAT_MS) {
+            uHolding = false;
+            explode(guy.x, guy.y);
+            screenExplode();
+            score = 0;
+            scoreNum.textContent = "0";
+            triggerGameOver();
+          }
+        }
+      }
 
       // ULTIMATE finishes: EXPLODE — every balloon on screen pops for 100 points!
       if (ultimateActive && Date.now() > ultimateUntil) {
@@ -1253,8 +1280,8 @@
         ctx.stroke();
       }
 
-      // Pressing U with no power: the guy jitters + turns yellow, trying to transform
-      var trying = Date.now() < tryingUntil;
+      // Pressing/holding U with no power: jitters + turns yellow, trying to transform
+      var trying = uHolding || Date.now() < tryingUntil;
       var jx = trying ? (Math.random() * 12 - 6) : 0;
       var jy = trying ? (Math.random() * 12 - 6) : 0;
       var cx = guy.x + jx;                 // jittered draw position
