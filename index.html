@@ -215,6 +215,7 @@
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <p class="gamehint">🎵 Shoot the Music button (top-right) with a bullet to turn music on/off!</p>
+    <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall or they cost you 3 lives!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
   </div>
 
@@ -459,6 +460,8 @@
       fireMode = false;
       fireCooldown = 800;
       escapingBalls.length = 0;
+      dangerBalloons.length = 0;
+      dangerCooldown = 700;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -525,6 +528,22 @@
         mouse.y = e.touches[0].clientY;
       }
     }, { passive: true });
+
+    // Wall platforms you can hide above to block danger balloons
+    function getWalls() {
+      return [
+        { x: W * 0.08, y: H * 0.55, w: W * 0.26, h: 20 },
+        { x: W * 0.66, y: H * 0.42, w: W * 0.26, h: 20 },
+        { x: W * 0.39, y: H * 0.70, w: W * 0.22, h: 20 }
+      ];
+    }
+    // Does a circle (cx,cy,r) overlap a rectangle?
+    function circleRectOverlap(cx, cy, r, rc) {
+      var nx = Math.max(rc.x, Math.min(cx, rc.x + rc.w));
+      var ny = Math.max(rc.y, Math.min(cy, rc.y + rc.h));
+      var dx = cx - nx, dy = cy - ny;
+      return (dx * dx + dy * dy) < r * r;
+    }
 
     // The home base square: a safe spot near the bottom-middle of the screen
     function getBase() {
@@ -595,6 +614,25 @@
         vx: (Math.random() < 0.5 ? -1 : 1) * 1.6,
         vy: (Math.random() < 0.5 ? -1 : 1) * 1.2
       };
+    }
+
+    // ---- Danger wave: un-poppable balloons you must hide from ----
+    var dangerBalloons = [];
+    var dangerCooldown = 700;   // frames until the next danger wave
+    var dangerWarnUntil = 0;    // show the warning text until this time
+
+    function spawnDangerWave() {
+      var count = 5 + Math.floor(Math.random() * 4);
+      for (var i = 0; i < count; i++) {
+        dangerBalloons.push({
+          x: 40 + Math.random() * (W - 80),
+          y: H + 40 + Math.random() * 160,
+          r: 24 + Math.random() * 8,
+          speed: 1.1 + Math.random() * 1.1
+        });
+      }
+      dangerWarnUntil = Date.now() + 2500;
+      playBonk();
     }
 
     // ---- The fire power-up ball ----
@@ -798,6 +836,85 @@
         }
 
         if (b.y + b.r < -30) balloons.splice(i, 1); // floated off the top
+      }
+
+      // ---- Walls + the danger wave ----
+      var walls = getWalls();
+      ctx.fillStyle = "#7a5230";
+      walls.forEach(function (wl) {
+        ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
+      });
+
+      if (!gameOver) {
+        dangerCooldown--;
+        if (dangerCooldown <= 0 && dangerBalloons.length === 0) {
+          spawnDangerWave();
+          dangerCooldown = 900 + Math.floor(Math.random() * 700);
+        }
+      }
+
+      for (var di = dangerBalloons.length - 1; di >= 0; di--) {
+        var d = dangerBalloons[di];
+        d.y -= d.speed;
+
+        // draw a scary spiky danger balloon
+        ctx.fillStyle = "#3a0d0d";
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y, d.r * 0.8, d.r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ff2a2a";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath(); // angry X face
+        ctx.moveTo(d.x - 7, d.y - 6); ctx.lineTo(d.x + 7, d.y + 3);
+        ctx.moveTo(d.x + 7, d.y - 6); ctx.lineTo(d.x - 7, d.y + 3);
+        ctx.stroke();
+
+        // Blocked by a wall? (this is how hiding works)
+        var blocked = false;
+        for (var wi = 0; wi < walls.length; wi++) {
+          if (circleRectOverlap(d.x, d.y, d.r, walls[wi])) { blocked = true; break; }
+        }
+        if (blocked) {
+          makeSparkles(d.x, d.y, "#ff2a2a");
+          dangerBalloons.splice(di, 1);
+          continue;
+        }
+
+        // Did it hit the guy? Lose 3 lives!
+        if (guy.x > 0 && !guySafe && !gameOver) {
+          var ddx = d.x - guy.x, ddy = d.y - guy.y;
+          if (Math.sqrt(ddx * ddx + ddy * ddy) < d.r + gw / 2) {
+            explode(guy.x, guy.y);
+            playBonk();
+            lives -= 3;
+            if (lives < 0) lives = 0;
+            updateLives();
+            if (rainbowMode) { rainbowMode = false; loseBallFloatAway(d.x, d.y, "rainbow"); }
+            if (fireMode)    { fireMode = false;    loseBallFloatAway(d.x, d.y, "fire"); }
+            var pt2 = respawnPoint();
+            guy.x = pt2.x; guy.y = pt2.y; mouse.x = pt2.x; mouse.y = pt2.y;
+            dangerBalloons.splice(di, 1);
+            if (lives <= 0) triggerGameOver();
+            continue;
+          }
+        }
+
+        if (d.y + d.r < -40) dangerBalloons.splice(di, 1); // floated away
+      }
+
+      // Flashing warning while a danger wave is rising
+      if (Date.now() < dangerWarnUntil) {
+        ctx.textAlign = "center";
+        ctx.font = "bold 32px 'Comic Sans MS', sans-serif";
+        ctx.fillStyle = (tick % 20 < 10) ? "#ff2a2a" : "#ffd23f";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 4;
+        ctx.strokeText("⚠️ DANGER! Hide behind a wall!", W / 2, 100);
+        ctx.fillText("⚠️ DANGER! Hide behind a wall!", W / 2, 100);
       }
 
       // ---- Rainbow ball: spawn, move, draw ----
