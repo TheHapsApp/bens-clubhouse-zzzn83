@@ -46,17 +46,17 @@
     /* Music on/off button, top-right corner */
     #musicBtn {
       position: fixed;
-      bottom: 14px;
-      right: 14px;
+      bottom: 20px;
+      right: 20px;
       z-index: 15;
       font-family: inherit;
-      font-size: 1rem;
+      font-size: 1.5rem;
       font-weight: bold;
       color: #6a2cff;
       background: #fff;
-      border: 3px solid #6a2cff;
-      border-radius: 16px;
-      padding: 8px 14px;
+      border: 4px solid #6a2cff;
+      border-radius: 18px;
+      padding: 16px 30px;
       cursor: pointer;
       box-shadow: 0 3px 0 rgba(0,0,0,0.2);
     }
@@ -679,6 +679,7 @@
       dangerWaveActive = false;
       ultimateActive = false;
       uHolding = false;
+      dying = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -837,17 +838,21 @@
       playBoom();
     }
 
-    // Shooting yourself off the top of the screen — red + blue particles, start over!
+    // Shooting yourself off the screen — the guy DISAPPEARS into a big
+    // burst of red, blue, purple, white and yellow particles, then start over!
     function blastOff() {
-      var py = Math.max(guy.y, 0);
-      for (var i = 0; i < 8; i++) {
-        makeSparkles(guy.x, py, "#ff2a2a"); // red
-        makeSparkles(guy.x, py, "#2a6bff"); // blue
+      var py = Math.max(Math.min(guy.y, H), 0);
+      var partyColors = ["#ff2a2a", "#2a6bff", "#b14cff", "#ffffff", "#ffd23f"];
+      for (var i = 0; i < 7; i++) {
+        for (var c = 0; c < partyColors.length; c++) {
+          makeSparkles(guy.x, py, partyColors[c]);
+        }
       }
       playBoom();
       score = 0;
       scoreNum.textContent = "0";
-      triggerGameOver();
+      dying = true;                       // hide the guy + pause hits
+      dyingUntil = Date.now() + 800;      // show the burst, then game over
     }
 
     function spawnBalloon() {
@@ -875,6 +880,8 @@
     var uHolding = false;       // is the U key being held with no power?
     var uHoldStart = 0;         // when the U hold started
     var U_OVERHEAT_MS = 1500;   // hold U longer than this with no power = BOOM!
+    var dying = false;          // guy has burst into particles, game over coming
+    var dyingUntil = 0;         // show the particle burst until this time
 
     // Make a ball drift away from the guy (he lost his power!)
     // type is "rainbow" or "fire" so it matches the ball you grabbed
@@ -991,7 +998,7 @@
     setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
 
     function shoot(big) {
-      if (gameOver || paused) return; // no shooting when over or paused
+      if (gameOver || paused || dying) return; // no shooting when over/paused/dying
       // If they tried a super shot but it's empty/recharging, fire a normal bullet
       if (big && (Date.now() < superLockedUntil || superUsed >= SUPER_MAX)) {
         big = false;
@@ -1089,6 +1096,9 @@
       // Fire mode wears off after its timer
       if (fireMode && Date.now() > fireUntil) fireMode = false;
 
+      // Death burst finished → show Game Over
+      if (dying && Date.now() > dyingUntil) { dying = false; triggerGameOver(); }
+
       // Holding U with no power OVERHEATS — too long and you explode + start over!
       if (uHolding && !gameOver) {
         if (rainbowMode || fireMode) {
@@ -1144,7 +1154,7 @@
       var gh = guy.h * sizeMul;
 
       // Touching a RED block = KABOOM and start over!
-      if (guy.x > 0 && !gameOver && !ultimateActive) {
+      if (guy.x > 0 && !gameOver && !ultimateActive && !dying) {
         var redBlocks = getWalls();
         for (var rbk = 0; rbk < redBlocks.length; rbk++) {
           if (redBlocks[rbk].red && circleRectOverlap(guy.x, guy.y, gw / 2, redBlocks[rbk])) {
@@ -1195,7 +1205,7 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive &&
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying &&
             Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
@@ -1319,7 +1329,7 @@
         }
 
         // Did it hit the guy? The WHOLE SCREEN blows up and you start over!
-        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive) {
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying) {
           var ddx = d.x - guy.x, ddy = d.y - guy.y;
           if (Math.sqrt(ddx * ddx + ddy * ddy) < d.r + gw / 2) {
             explode(guy.x, guy.y);
@@ -1500,7 +1510,8 @@
 
         // Only NOW (if the bullet didn't pop a balloon) can it hit the Music button
         var mb = document.getElementById("musicBtn").getBoundingClientRect();
-        if (bu.x > mb.left && bu.x < mb.right && bu.y > mb.top && bu.y < mb.bottom) {
+        var M = 30; // extra hit zone so it's easier to shoot
+        if (bu.x > mb.left - M && bu.x < mb.right + M && bu.y > mb.top - M && bu.y < mb.bottom + M) {
           toggleMusic();
           jitterButton();
           bullets.splice(j, 1);
@@ -1537,6 +1548,9 @@
         ctx.globalAlpha = 1;
         if (fl.life <= 0) floaters.splice(f, 1);
       }
+
+      // Hide the guy entirely while he's a cloud of particles (dying)
+      if (!dying) {
 
       // While holding S, show a charge ball growing on the guy's head
       if (isCharging) {
@@ -1597,6 +1611,8 @@
       ctx.fillStyle = "#6a2cff";
       ctx.beginPath(); ctx.arc(cx - gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(cx + gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
+
+      } // end if (!dying)
 
       requestAnimationFrame(loop);
     }
