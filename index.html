@@ -1088,8 +1088,8 @@
 
       // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
       var gy = guy.y - gh / 2; // top of the triangle
-      // Fire = orange, rainbow = rainbow, otherwise white
-      if (fireMode)         ctx.fillStyle = "hsl(" + (18 + (tick % 18)) + ", 100%, 55%)";
+      // Fire = yellow, rainbow = rainbow, otherwise white
+      if (fireMode)         ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
       else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
       else                  ctx.fillStyle = "#fff";
       ctx.beginPath();
