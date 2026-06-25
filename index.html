@@ -206,6 +206,7 @@
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
+    <p class="gamehint">🎵 Shoot the Music button (top-right) with a bullet to turn music on/off!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
   </div>
 
@@ -399,10 +400,12 @@
     function startMusic() { if (musicOn) return; musicOn = true; scheduleBar(); updateMusicBtn(); }
     function stopMusic() { musicOn = false; if (musicTimer) clearTimeout(musicTimer); updateMusicBtn(); }
 
-    document.getElementById("musicBtn").addEventListener("click", function () {
+    function toggleMusic() {
+      ensureAudio(); // make sure the browser lets us play sound
       if (musicOn) { stopMusic(); musicAllowed = false; }
       else { musicAllowed = true; startMusic(); }
-    });
+    }
+    document.getElementById("musicBtn").addEventListener("click", toggleMusic);
 
     var balloonColors = ["#ff5fa2", "#ffd23f", "#3fd0ff", "#8a5cff", "#5fff8f", "#ff8f3f"];
     var balloons = [];
@@ -673,7 +676,6 @@
         points: points
       });
       playShoot();
-      if (musicAllowed && !musicOn) startMusic(); // start music when you start playing
     }
 
     function makeSparkles(x, y, color) {
@@ -861,6 +863,14 @@
         }
 
         if (bu.y + bu.r < -10) { bullets.splice(j, 1); continue; }
+
+        // Shoot the Music button to turn music on/off!
+        var mb = document.getElementById("musicBtn").getBoundingClientRect();
+        if (bu.x > mb.left && bu.x < mb.right && bu.y > mb.top && bu.y < mb.bottom) {
+          toggleMusic();
+          bullets.splice(j, 1);
+          continue;
+        }
 
         // A SUPER shot hitting the rainbow ball powers up the guy!
         if (rainbowBall && bu.big) {
