@@ -138,7 +138,7 @@
     <h1>🎂 Birthday Countdown! 🎉</h1>
     <p class="hint">Press a box and type in your answer! 👇</p>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
-    <div class="score" id="score">Balloons popped: 0</div>
+    <div class="score" id="score">Score: 0</div>
 
     <div class="countdown">
       <div class="number" id="days">--</div>
@@ -315,7 +315,12 @@
     var balloons = [];
     var bullets = [];
     var sparkles = [];
+    var floaters = []; // little "+3" / "+5" point popups
     var score = 0;
+
+    function makeFloater(x, y, text, color) {
+      floaters.push({ x: x, y: y, text: text, color: color, life: 50 });
+    }
 
     // The triangle guy. He glides toward the mouse like a ball in agar.io.
     var guy = { x: -1, y: -1, w: 46, h: 40, ease: 0.12 };
@@ -372,12 +377,21 @@
     });
 
     function shoot(big) {
+      var color = "#fff", points = 1;
+      if (!big) {
+        // Roll the dice for a rare special bullet!
+        var roll = Math.random();
+        if (roll < 0.04)      { color = "#b14cff"; points = 5; } // 🟣 super rare purple
+        else if (roll < 0.16) { color = "#ff3b3b"; points = 3; } // 🔴 rare red
+      }
       bullets.push({
         x: guy.x,
         y: guy.y - guy.h / 2 - 8,
         speed: 9,
         r: big ? 25 : 5,   // big bullet is 5x bigger
-        big: !!big
+        big: !!big,
+        color: color,
+        points: points
       });
     }
 
@@ -442,7 +456,7 @@
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
         bu.y -= bu.speed;
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = bu.color || "#fff";
         ctx.beginPath();
         ctx.arc(bu.x, bu.y, bu.r, 0, Math.PI * 2);
         ctx.fill();
@@ -463,9 +477,12 @@
           var dy = bu.y - bal.y;
           if (Math.sqrt(dx * dx + dy * dy) < bal.r + bu.r) {
             makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
+            if (bu.points > 1) {
+              makeFloater(bal.drawX || bal.x, bal.y, "+" + bu.points, bu.color);
+            }
             balloons.splice(k, 1);
-            score++;
-            document.getElementById("score").textContent = "Balloons popped: " + score;
+            score += bu.points;
+            document.getElementById("score").textContent = "Score: " + score;
             if (!bu.big) { // small bullets stop at the first balloon...
               bullets.splice(j, 1);
               bulletGone = true;
@@ -488,6 +505,23 @@
         ctx.fill();
         ctx.globalAlpha = 1;
         if (sp.life <= 0) sparkles.splice(s, 1);
+      }
+
+      // Draw + float the "+3" / "+5" point popups upward
+      ctx.textAlign = "center";
+      ctx.font = "bold 30px 'Comic Sans MS', sans-serif";
+      for (var f = floaters.length - 1; f >= 0; f--) {
+        var fl = floaters[f];
+        fl.y -= 1.2;
+        fl.life--;
+        ctx.globalAlpha = Math.max(fl.life / 50, 0);
+        ctx.fillStyle = fl.color;
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 4;
+        ctx.strokeText(fl.text, fl.x, fl.y);
+        ctx.fillText(fl.text, fl.x, fl.y);
+        ctx.globalAlpha = 1;
+        if (fl.life <= 0) floaters.splice(f, 1);
       }
 
       // While holding S, show a charge ball growing on the guy's head
