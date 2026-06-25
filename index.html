@@ -205,6 +205,7 @@
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
+    <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT — every pop is worth 3 points!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
 
     <div class="countdown">
@@ -561,6 +562,9 @@
       rainbowBall = null;
       rainbowMode = false;
       rainbowCooldown = 500;
+      fireBall = null;
+      fireMode = false;
+      fireCooldown = 800;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -685,6 +689,22 @@
       };
     }
 
+    // ---- The fire power-up ball ----
+    var fireBall = null;      // {x, y, r, vx, vy}
+    var fireMode = false;     // is the guy giant + fiery?
+    var fireUntil = 0;        // time when fire mode ends
+    var fireCooldown = 800;   // frames until the next fire ball
+
+    function spawnFireBall() {
+      fireBall = {
+        x: 80 + Math.random() * (W - 160),
+        y: 120 + Math.random() * (H - 240),
+        r: 36,
+        vx: (Math.random() < 0.5 ? -1 : 1) * 2.0,
+        vy: (Math.random() < 0.5 ? -1 : 1) * 1.5
+      };
+    }
+
     // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
     var isCharging = false;
     var chargeStart = 0;
@@ -749,11 +769,17 @@
         if (roll < 0.04)      { color = "#b14cff"; points = 5; } // 🟣 super rare purple
         else if (roll < 0.16) { color = "#ff3b3b"; points = 3; } // 🔴 rare red
       }
+      var radius = big ? 25 : 5;
+      if (fireMode) {           // FIRE! giant fiery bullets worth 3 each
+        radius = big ? 45 : 18;
+        color = "#ff6a00";
+        points = 3;
+      }
       bullets.push({
         x: guy.x,
         y: guy.y - guy.h / 2 - 8,
         speed: 9,
-        r: big ? 25 : 5,   // big bullet is 5x bigger
+        r: radius,
         big: !!big,
         color: color,
         points: points
@@ -775,6 +801,9 @@
       ctx.clearRect(0, 0, W, H);
       tick++;
 
+      // Fire mode wears off after its timer
+      if (fireMode && Date.now() > fireUntil) fireMode = false;
+
       // Start the guy (and the target) in the middle
       if (guy.x < 0) { guy.x = W / 2; guy.y = H / 2; }
       if (mouse.x < 0) { mouse.x = W / 2; mouse.y = H / 2; }
@@ -787,6 +816,11 @@
 
       // Safe while sitting in the WHEN box square
       var guySafe = guyIsSafe();
+
+      // The guy (and his hitbox) is bigger while fire mode is on
+      var sizeMul = fireMode ? 1.9 : 1;
+      var gw = guy.w * sizeMul;
+      var gh = guy.h * sizeMul;
 
       // Spawn new balloons over time (paused once the game is over)
       if (!gameOver) {
@@ -826,7 +860,7 @@
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
         if (guy.x > 0 && !guySafe && !gameOver &&
-            Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
+            Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
           lives--;                         // lose a life
@@ -861,6 +895,25 @@
         }
       }
 
+      // ---- Fire ball: spawn, move, draw ----
+      if (!gameOver && !fireBall && !fireMode) {
+        fireCooldown--;
+        if (fireCooldown <= 0) spawnFireBall();
+      }
+      if (fireBall) {
+        var fb = fireBall;
+        fb.x += fb.vx; fb.y += fb.vy;
+        if (fb.x < fb.r || fb.x > W - fb.r) fb.vx *= -1;
+        if (fb.y < fb.r || fb.y > H - fb.r) fb.vy *= -1;
+        // draw fiery rings (reds, oranges, yellows = hue 0 to 50)
+        for (var fr = 5; fr >= 1; fr--) {
+          ctx.fillStyle = "hsl(" + ((tick * 6 + fr * 12) % 50) + ", 100%, 55%)";
+          ctx.beginPath();
+          ctx.arc(fb.x, fb.y, fb.r * fr / 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       // Draw + move bullets, check for pops
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
@@ -887,6 +940,20 @@
             rainbowMode = true;
             rainbowBall = null;
             rainbowCooldown = 600 + Math.floor(Math.random() * 600);
+            explode(bu.x, bu.y);
+            playPowerup();
+          }
+        }
+
+        // A SUPER shot hitting the fire ball turns the guy GIANT + fiery!
+        if (fireBall && bu.big) {
+          var fdx = bu.x - fireBall.x;
+          var fdy = bu.y - fireBall.y;
+          if (Math.sqrt(fdx * fdx + fdy * fdy) < fireBall.r + bu.r) {
+            fireMode = true;
+            fireUntil = Date.now() + 12000; // lasts 12 seconds
+            fireBall = null;
+            fireCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
             playPowerup();
           }
@@ -953,7 +1020,7 @@
         var charge = Math.min(heldNow / CHARGE_MS, 1); // 0 to 1
         ctx.fillStyle = charge >= 1 ? "#ffd23f" : "rgba(255,255,255,0.85)";
         ctx.beginPath();
-        ctx.arc(guy.x, guy.y - guy.h / 2 - 12, 4 + charge * 21, 0, Math.PI * 2);
+        ctx.arc(guy.x, guy.y - gh / 2 - 12, 4 + charge * 21, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -962,18 +1029,20 @@
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(guy.x, guy.y, guy.w / 2 + 12, 0, Math.PI * 2);
+        ctx.arc(guy.x, guy.y, gw / 2 + 12, 0, Math.PI * 2);
         ctx.stroke();
       }
 
       // Draw the triangle guy, pointing up, centered on (guy.x, guy.y)
-      var gy = guy.y - guy.h / 2; // top of the triangle
-      // Rainbow color when powered up, otherwise white
-      ctx.fillStyle = rainbowMode ? "hsl(" + (tick * 8 % 360) + ", 95%, 60%)" : "#fff";
+      var gy = guy.y - gh / 2; // top of the triangle
+      // Fire = orange, rainbow = rainbow, otherwise white
+      if (fireMode)         ctx.fillStyle = "hsl(" + (18 + (tick % 18)) + ", 100%, 55%)";
+      else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
+      else                  ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.moveTo(guy.x, gy);                       // top point
-      ctx.lineTo(guy.x - guy.w / 2, gy + guy.h);   // bottom left
-      ctx.lineTo(guy.x + guy.w / 2, gy + guy.h);   // bottom right
+      ctx.moveTo(guy.x, gy);                 // top point
+      ctx.lineTo(guy.x - gw / 2, gy + gh);   // bottom left
+      ctx.lineTo(guy.x + gw / 2, gy + gh);   // bottom right
       ctx.closePath();
       ctx.fill();
 
@@ -989,8 +1058,8 @@
       }
       // little eyes so he's a "guy"
       ctx.fillStyle = "#6a2cff";
-      ctx.beginPath(); ctx.arc(guy.x - 6, gy + guy.h - 12, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(guy.x + 6, gy + guy.h - 12, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(guy.x - gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(guy.x + gw * 0.13, gy + gh - gh * 0.3, 3, 0, Math.PI * 2); ctx.fill();
 
       requestAnimationFrame(loop);
     }
