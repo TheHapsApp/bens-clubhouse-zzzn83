@@ -339,6 +339,23 @@
       }
     }, { passive: true });
 
+    // Where the guy respawns: the middle of the 📅 emoji in the WHEN box
+    function respawnPoint() {
+      var icon = document.querySelector("#box-when .icon");
+      if (icon) {
+        var r = icon.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+      return { x: W / 2, y: H / 2 };
+    }
+
+    // Big burst of sparkles when the guy explodes
+    function explode(x, y) {
+      makeSparkles(x, y, "#fff");
+      makeSparkles(x, y, "#ffd23f");
+      makeSparkles(x, y, "#ff5fa2");
+    }
+
     function spawnBalloon() {
       balloons.push({
         x: 30 + Math.random() * (W - 60),
@@ -450,6 +467,18 @@
         ctx.fill();
 
         b.drawX = bx; // remember where we drew it for collisions
+
+        // Did this balloon bump into the triangle guy?
+        var gdx = bx - guy.x;
+        var gdy = b.y - guy.y;
+        if (guy.x > 0 && Math.sqrt(gdx * gdx + gdy * gdy) < b.r + guy.w / 2) {
+          explode(guy.x, guy.y);          // KABOOM!
+          var pt = respawnPoint();         // start over at the WHEN box
+          guy.x = pt.x; guy.y = pt.y;
+          mouse.x = pt.x; mouse.y = pt.y;
+          balloons.splice(i, 1);
+          continue;
+        }
 
         if (b.y + b.r < -30) balloons.splice(i, 1); // floated off the top
       }
