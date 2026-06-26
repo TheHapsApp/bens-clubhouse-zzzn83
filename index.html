@@ -623,6 +623,10 @@
       else { musicAllowed = true; startMusic(); }
     }
     document.getElementById("musicBtn").addEventListener("click", toggleMusic);
+    // Press M to turn the music on/off
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "m" || e.key === "M") toggleMusic();
+    });
 
     // ---- Pause the whole game + music ----
     var paused = false;
