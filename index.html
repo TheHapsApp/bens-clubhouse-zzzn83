@@ -670,6 +670,10 @@
             heldType = "clone100";
             makeFloater(item.x, item.y, "100 CLONES!! Press T", "#ffd23f");
             playPowerup();
+          } else if (item.type === "clone300") {
+            heldType = "clone300";
+            makeFloater(item.x, item.y, "✨300 CLONES!!! Press T✨", "#ffd23f");
+            playPowerup();
           } else {
             usePickup();
             makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
@@ -1034,7 +1038,9 @@
       }
       // 90% of the time it's a ball, 10% it's a plain pop item
       var roll = Math.random();
-      if (roll < 0.20) {
+      if (roll < 0.01) {
+        items.push({ x: x, y: y, born: Date.now(), type: "clone300" }); // 🌈✨ LEGENDARY: 300 clones (1%)
+      } else if (roll < 0.20) {
         items.push({ x: x, y: y, born: Date.now(), type: "wheel" });    // yellow circle = prize wheel
       } else if (roll < 0.45) {
         items.push({ x: x, y: y, born: Date.now(), type: "chomper" });  // green ball = Chomper
@@ -2068,6 +2074,18 @@
           }
           ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.arc(item.x, item.y, 18, 0, Math.PI * 2); ctx.stroke();
+        } else if (item.type === "clone300") {
+          // LEGENDARY GLOWING rainbow ball — 300 clones!
+          ctx.save();
+          ctx.shadowBlur = 25;
+          ctx.shadowColor = "hsl(" + (tick * 10 % 360) + ", 100%, 60%)";
+          for (var gr = 6; gr >= 1; gr--) {
+            ctx.fillStyle = "hsl(" + ((tick * 10 + gr * 55) % 360) + ", 100%, 60%)";
+            ctx.beginPath(); ctx.arc(item.x, item.y, 22 * gr / 6, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.restore();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 22, 0, Math.PI * 2); ctx.stroke();
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
@@ -2093,9 +2111,12 @@
         var tcol = "#3ddc4e";
         if (tball.kind === "clone") tcol = "#ff2a2a";
         else if (tball.kind === "clone50") tcol = "#9b30ff";
-        else if (tball.kind === "clone100") tcol = "hsl(" + (tick * 6 % 360) + ", 95%, 60%)";
+        else if (tball.kind === "clone100" || tball.kind === "clone300") tcol = "hsl(" + (tick * 8 % 360) + ", 100%, 60%)";
+        ctx.save();
+        if (tball.kind === "clone300") { ctx.shadowBlur = 20; ctx.shadowColor = tcol; }
         ctx.fillStyle = tcol;
         ctx.beginPath(); ctx.arc(tball.x, tball.y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
         ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
         var landed = false;
         if (tball.y >= H - 12 || tball.x < 6 || tball.x > W - 6) landed = true;
@@ -2108,8 +2129,8 @@
           if (Math.sqrt(ldx * ldx + ldy * ldy) < lbal.r + 12) landed = true;
         }
         if (landed) {
-          if (tball.kind === "clone" || tball.kind === "clone50" || tball.kind === "clone100") {
-            var num = tball.kind === "clone100" ? 100 : (tball.kind === "clone50" ? 50 : 5);
+          if (tball.kind === "clone" || tball.kind === "clone50" || tball.kind === "clone100" || tball.kind === "clone300") {
+            var num = tball.kind === "clone300" ? 300 : (tball.kind === "clone100" ? 100 : (tball.kind === "clone50" ? 50 : 5));
             spawnClones(num);
             makeFloater(tball.x, tball.y, num + " CLONES! 👥", "#ffd23f");
             makeSparkles(tball.x, tball.y, "#ffd23f", 24);
@@ -2288,7 +2309,7 @@
         var hcol = "#3ddc4e";
         if (heldType === "clone") hcol = "#ff2a2a";
         else if (heldType === "clone50") hcol = "#9b30ff";
-        else if (heldType === "clone100") hcol = "hsl(" + (tick * 6 % 360) + ", 95%, 60%)";
+        else if (heldType === "clone100" || heldType === "clone300") hcol = "hsl(" + (tick * 8 % 360) + ", 100%, 60%)";
         ctx.fillStyle = hcol;
         ctx.beginPath(); ctx.arc(guy.x, guy.y - gh / 2 - 22, 12, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
