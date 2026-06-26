@@ -717,7 +717,11 @@
     var chompers = [];       // big Chompers eating balloons where a ball landed
 
     function spawnChomper(x, y) {
-      chompers.push({ x: x, y: Math.min(y, H - 60), born: Date.now() });
+      chompers.push({
+        x: x, y: Math.min(y, H - 60), born: Date.now(),
+        vx: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 1.2),
+        vy: (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random())
+      });
     }
 
     function spawnHeart(x, y, value) {
@@ -1692,9 +1696,10 @@
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
         bu.y += bu.speed * (bu.dir || -1); // dir -1 = up, +1 = down
-        // Bounce off the walls!
+        // Bounce off the brown walls (red walls let bullets pass through)
         for (var bw = 0; bw < walls.length; bw++) {
           var wbl = walls[bw];
+          if (wbl.red) continue; // straight through red walls
           if (circleRectOverlap(bu.x, bu.y, bu.r, wbl)) {
             bu.dir = (bu.dir || -1) * -1; // flip up/down
             bu.y = (bu.dir < 0) ? (wbl.y - bu.r - 1) : (wbl.y + wbl.h + bu.r + 1);
@@ -1923,6 +1928,10 @@
         var cmp = chompers[ch];
         var cage = Date.now() - cmp.born;
         if (cage > 3000) { chompers.splice(ch, 1); continue; }
+        // move around, bouncing off the edges
+        cmp.x += cmp.vx; cmp.y += cmp.vy;
+        if (cmp.x < 50 || cmp.x > W - 50) cmp.vx *= -1;
+        if (cmp.y < 50 || cmp.y > H - 50) cmp.vy *= -1;
         var mouth = Math.abs(Math.sin(tick * 0.3)) * 0.7 + 0.05; // open/close
         // body (round green monster with a big toothy mouth opening upward)
         ctx.fillStyle = "#3ddc4e";
