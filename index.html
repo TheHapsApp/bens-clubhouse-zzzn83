@@ -1965,10 +1965,12 @@
         }
         if (bulletGone) continue;
 
-        // Only NOW (if the bullet didn't pop a balloon) can it hit the Music button
+        // Only NOW (if the bullet didn't pop a balloon) can it hit the Music button.
+        // Clone bullets (which have vx) can't toggle the music — only YOUR bullets.
         var mb = document.getElementById("musicBtn").getBoundingClientRect();
         var M = 30; // extra hit zone so it's easier to shoot
-        if (bu.x > mb.left - M && bu.x < mb.right + M && bu.y > mb.top - M && bu.y < mb.bottom + M) {
+        if (bu.vx === undefined &&
+            bu.x > mb.left - M && bu.x < mb.right + M && bu.y > mb.top - M && bu.y < mb.bottom + M) {
           toggleMusic();
           jitterButton();
           bullets.splice(j, 1);
