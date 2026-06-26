@@ -299,7 +299,7 @@
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
-    <p class="gamehint">🎁 Fly to a pickup item and press A to pop a bunch of balloons at once!</p>
+    <p class="gamehint">🎁 Fly to a pickup item and press A to grab it! 🟡 yellow = prize wheel • 🟢 green = Chomper ball (press T to throw!)</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
@@ -629,6 +629,15 @@
       if (e.key === "m" || e.key === "M") toggleMusic();
     });
 
+    // Press T to throw the Chomper ball
+    window.addEventListener("keydown", function (e) {
+      if (e.key !== "t" && e.key !== "T") return;
+      if (!holdingBall || gameOver || paused || dying || wheelActive || !started) return;
+      holdingBall = false;
+      thrownBalls.push({ x: guy.x, y: guy.y, vx: 0, vy: 5 });
+      playShoot();
+    });
+
     // Press A to grab a nearby pickup item
     window.addEventListener("keydown", function (e) {
       if (e.key !== "a" && e.key !== "A") return;
@@ -639,6 +648,10 @@
         if (Math.sqrt(dx * dx + dy * dy) < 80) {
           if (item.type === "wheel") {
             startWheel(); // spin for a random prize!
+          } else if (item.type === "chomper") {
+            holdingBall = true; // now you're holding the Chomper ball
+            makeFloater(item.x, item.y, "GOT CHOMP BALL! Press T", "#3ddc4e");
+            playPowerup();
           } else {
             usePickup();
             makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
@@ -699,6 +712,13 @@
     var bossActive = false;
     var items = [];          // pickups — fly near one and press A to use it
     var itemCooldown = 350;  // frames until the next item appears
+    var holdingBall = false; // holding the Chomper ball (press T to throw)
+    var thrownBalls = [];    // Chomper balls flying through the air
+    var chompers = [];       // big Chompers eating balloons where a ball landed
+
+    function spawnChomper(x, y) {
+      chompers.push({ x: x, y: Math.min(y, H - 60), born: Date.now() });
+    }
 
     function spawnHeart(x, y, value) {
       value = value || 1; // 1 = ❤️ (one life), 2 = 💞 (two lives)
@@ -750,6 +770,9 @@
       items.length = 0;
       itemCooldown = 350;
       wheelActive = false;
+      holdingBall = false;
+      thrownBalls.length = 0;
+      chompers.length = 0;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -945,8 +968,11 @@
     function spawnItem() {
       var x = 60 + Math.random() * (W - 120);
       var y = 90 + Math.random() * (H - 240);
-      if (Math.random() < 0.3) {
-        items.push({ x: x, y: y, born: Date.now(), type: "wheel" }); // yellow circle = prize wheel
+      var roll = Math.random();
+      if (roll < 0.25) {
+        items.push({ x: x, y: y, born: Date.now(), type: "wheel" });   // yellow circle = prize wheel
+      } else if (roll < 0.45) {
+        items.push({ x: x, y: y, born: Date.now(), type: "chomper" }); // green ball = Chomper
       } else {
         var emojis = ["💣", "⚡", "⭐", "🎁"];
         items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
@@ -1848,6 +1874,12 @@
           ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(item.x, item.y, 18, 0, Math.PI * 2); ctx.stroke();
           ctx.fillStyle = "#b8860b"; ctx.beginPath(); ctx.arc(item.x, item.y, 5, 0, Math.PI * 2); ctx.fill();
+        } else if (item.type === "chomper") {
+          // a green ball — throw it to make a Chomper!
+          ctx.fillStyle = "#3ddc4e";
+          ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.stroke();
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
@@ -1862,6 +1894,57 @@
           ctx.strokeText("Press A!", item.x, item.y - 28);
           ctx.fillText("Press A!", item.x, item.y - 28);
           ctx.font = "36px 'Comic Sans MS', sans-serif";
+        }
+      }
+
+      // Thrown Chomper balls — fly with gravity, land on something → make a Chomper
+      for (var tb = thrownBalls.length - 1; tb >= 0; tb--) {
+        var tball = thrownBalls[tb];
+        tball.vy += 0.25; // gravity
+        tball.x += tball.vx; tball.y += tball.vy;
+        ctx.fillStyle = "#3ddc4e";
+        ctx.beginPath(); ctx.arc(tball.x, tball.y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        var landed = false;
+        if (tball.y >= H - 12 || tball.x < 6 || tball.x > W - 6) landed = true;
+        for (var lw = 0; lw < walls.length && !landed; lw++) {
+          if (circleRectOverlap(tball.x, tball.y, 12, walls[lw])) landed = true;
+        }
+        for (var lb = 0; lb < balloons.length && !landed; lb++) {
+          var lbal = balloons[lb];
+          var ldx = (lbal.drawX || lbal.x) - tball.x, ldy = lbal.y - tball.y;
+          if (Math.sqrt(ldx * ldx + ldy * ldy) < lbal.r + 12) landed = true;
+        }
+        if (landed) { spawnChomper(tball.x, tball.y); playBoom(); thrownBalls.splice(tb, 1); }
+      }
+
+      // Chompers — a big green monster that chomps balloons nearby for a few seconds
+      for (var ch = chompers.length - 1; ch >= 0; ch--) {
+        var cmp = chompers[ch];
+        var cage = Date.now() - cmp.born;
+        if (cage > 3000) { chompers.splice(ch, 1); continue; }
+        var mouth = Math.abs(Math.sin(tick * 0.3)) * 0.7 + 0.05; // open/close
+        // body (round green monster with a big toothy mouth opening upward)
+        ctx.fillStyle = "#3ddc4e";
+        ctx.beginPath();
+        ctx.moveTo(cmp.x, cmp.y);
+        ctx.arc(cmp.x, cmp.y, 50, -Math.PI / 2 + mouth, -Math.PI / 2 - mouth + Math.PI * 2);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = "#000"; // eyes
+        ctx.beginPath(); ctx.arc(cmp.x - 16, cmp.y - 20, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cmp.x + 16, cmp.y - 20, 5, 0, Math.PI * 2); ctx.fill();
+        // eat any balloons nearby!
+        for (var eb = balloons.length - 1; eb >= 0; eb--) {
+          var ebal = balloons[eb];
+          if (ebal.boss) continue;
+          var edx = (ebal.drawX || ebal.x) - cmp.x, edy = ebal.y - cmp.y;
+          if (Math.sqrt(edx * edx + edy * edy) < 120) {
+            makeSparkles(ebal.drawX || ebal.x, ebal.y, ebal.color);
+            makeFloater(ebal.drawX || ebal.x, ebal.y, "+2", "#3ddc4e");
+            balloons.splice(eb, 1); score += 2; popCount++;
+            bumpScore(); playPop();
+          }
         }
       }
 
@@ -1927,6 +2010,17 @@
       ctx.fillStyle = "#6a2cff";
       ctx.beginPath(); ctx.arc(cx - gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(cx + gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
+
+      // Holding the Chomper ball? Show it bobbing over the guy + a reminder
+      if (holdingBall) {
+        ctx.fillStyle = "#3ddc4e";
+        ctx.beginPath(); ctx.arc(guy.x, guy.y - gh / 2 - 22, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Press T to throw!", guy.x, guy.y - gh / 2 - 42);
+      }
 
       } // end if (!dying)
 
