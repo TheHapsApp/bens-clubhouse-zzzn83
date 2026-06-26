@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>The Big Snack Quest!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #3fd0ff, #8a5cff, #ff5fa2);
+      background-size: 300% 300%;
+      animation: flow 12s ease infinite;
+      overflow-x: hidden;
+      padding-bottom: 30px;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 {
+      font-size: clamp(1.8rem, 7vw, 3.4rem);
+      margin: 18px 12px 6px;
+      text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+    }
+    .sub { font-size: clamp(1rem, 3.5vw, 1.3rem); margin-bottom: 14px; }
+
+    /* the road with stops */
+    #road {
+      position: relative;
+      margin: 24px auto 10px;
+      width: 92%;
+      max-width: 760px;
+      height: 130px;
+      background: #5a5a6a;
+      border-top: 6px dashed #ffd23f;
+      border-bottom: 6px dashed #ffd23f;
+      border-radius: 14px;
+    }
+    .stop {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 74px; height: 74px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      border: 4px solid #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.4rem;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .stop.done { background: #5fff8f; }
+    .stop.active { transform: translate(-50%, -50%) scale(1.2); background: #ffd23f; }
+    .stop .name {
+      position: absolute;
+      top: 80px;
+      width: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.85rem;
+      line-height: 1.1;
+    }
+    #hero {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.8rem;
+      transition: left 0.7s cubic-bezier(.5,1.6,.5,1);
+      z-index: 3;
+      filter: drop-shadow(2px 3px 2px rgba(0,0,0,0.3));
+    }
+
+    #message {
+      font-size: clamp(1.3rem, 5.5vw, 2.2rem);
+      min-height: 1.5em;
+      margin: 18px 12px 6px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.18);
+    }
+    .bag { font-size: 1.4rem; min-height: 1.5em; margin-bottom: 10px; }
+
+    .btn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: clamp(1.2rem, 5vw, 1.8rem);
+      color: #6a2cff;
+      background: #fff;
+      border: 4px solid #fff;
+      border-radius: 24px;
+      padding: 14px 34px;
+      margin: 8px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+    .btn.small { font-size: 1rem; padding: 10px 18px; color: #b23; }
+
+    .confetti {
+      position: fixed;
+      font-size: 1.8rem;
+      top: -40px;
+      z-index: 9;
+      pointer-events: none;
+      animation: fall 2.4s linear forwards;
+    }
+    @keyframes fall {
+      to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🛣️ The Big Snack Quest! 🍕</h1>
+  <p class="sub">Tap GO to do each step of the quest!</p>
+
+  <div id="road">
+    <div id="hero">🚗</div>
+  </div>
+
+  <div id="message">Ready? Tap GO to start the quest! 👇</div>
+  <div class="bag" id="bag"></div>
+
+  <button class="btn" id="goBtn">GO! 🚦</button>
+  <button class="btn small" id="resetBtn">Start Over</button>
+
+  <script>
+    var steps = [
+      { emoji: "🍕", name: "Get a Pizza",        msg: "You grabbed a hot cheesy PIZZA! 🍕", bag: "🍕" },
+      { emoji: "💧", name: "Gas Station Water",  msg: "You filled up on GAS STATION WATER! 💧", bag: "🍕💧" },
+      { emoji: "🗑️", name: "The Dump",           msg: "You chucked it all in the DUMP! 🗑️💨", bag: "🗑️ (all gone!)" },
+      { emoji: "🏪", name: "Maverick",           msg: "You made it to MAVERICK! Quest complete! 🎉", bag: "🏪 You did it!" }
+    ];
+
+    var road = document.getElementById("road");
+    var hero = document.getElementById("hero");
+    var msg = document.getElementById("message");
+    var bag = document.getElementById("bag");
+    var goBtn = document.getElementById("goBtn");
+    var step = -1; // not started
+
+    // build the stops along the road
+    var stopEls = [];
+    function buildStops() {
+      stopEls.forEach(function (s) { s.remove(); });
+      stopEls = [];
+      for (var i = 0; i < steps.length; i++) {
+        var pct = (i + 0.5) / steps.length * 100;
+        var el = document.createElement("div");
+        el.className = "stop";
+        el.style.left = pct + "%";
+        el.innerHTML = steps[i].emoji + '<div class="name">' + steps[i].name + '</div>';
+        road.appendChild(el);
+        stopEls.push(el);
+      }
+    }
+    buildStops();
+
+    function heroLeftFor(i) {
+      if (i < 0) return "4%";
+      return ((i + 0.5) / steps.length * 100) + "%";
+    }
+
+    function go() {
+      if (step >= steps.length - 1) return; // done
+      step++;
+      hero.style.left = heroLeftFor(step);
+      stopEls.forEach(function (el, i) {
+        el.classList.toggle("active", i === step);
+        el.classList.toggle("done", i < step);
+      });
+      msg.textContent = steps[step].msg;
+      bag.textContent = "🎒 " + steps[step].bag;
+      if (step === steps.length - 1) {
+        stopEls[step].classList.add("done");
+        stopEls[step].classList.remove("active");
+        hero.textContent = "🎉";
+        party();
+        goBtn.textContent = "Quest done! 🏆";
+      }
+    }
+
+    function reset() {
+      step = -1;
+      hero.style.left = heroLeftFor(-1);
+      hero.textContent = "🚗";
+      stopEls.forEach(function (el) { el.classList.remove("active", "done"); });
+      msg.textContent = "Ready? Tap GO to start the quest! 👇";
+      bag.textContent = "";
+      goBtn.textContent = "GO! 🚦";
+    }
+
+    function party() {
+      var emojis = ["🎉", "🍕", "💧", "🏪", "⭐", "🚗", "🎈"];
+      for (var i = 0; i < 40; i++) {
+        var c = document.createElement("div");
+        c.className = "confetti";
+        c.textContent = emojis[i % emojis.length];
+        c.style.left = Math.random() * 100 + "vw";
+        c.style.animationDelay = (Math.random() * 0.8) + "s";
+        document.body.appendChild(c);
+        setTimeout(function (node) { return function () { node.remove(); }; }(c), 3400);
+      }
+    }
+
+    goBtn.addEventListener("click", go);
+    document.getElementById("resetBtn").addEventListener("click", reset);
+    reset();
+  </script>
+</body>
+</html>
