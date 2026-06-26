@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Snack Shack Order!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #ff8f3f, #ffd23f, #ff5fa2);
+      background-size: 300% 300%;
+      animation: flow 12s ease infinite;
+      padding: 22px 14px 50px;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 { font-size: clamp(1.8rem, 7vw, 3.2rem); text-shadow: 3px 3px 0 rgba(0,0,0,0.2); }
+    .sub { font-size: clamp(1rem, 3.4vw, 1.25rem); margin: 8px 0 14px; }
+
+    .menu {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 12px;
+      max-width: 620px;
+      margin: 0 auto 18px;
+    }
+    .food {
+      background: rgba(255,255,255,0.22);
+      border: 4px solid #fff;
+      border-radius: 20px;
+      padding: 14px 8px;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+      backdrop-filter: blur(3px);
+    }
+    .food:active { transform: scale(0.92); }
+    .food .emo { font-size: 2.8rem; }
+    .food .nm { font-size: 0.95rem; margin-top: 4px; }
+
+    #tray {
+      max-width: 620px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.22);
+      border: 5px dashed #fff;
+      border-radius: 22px;
+      padding: 16px;
+      min-height: 90px;
+      font-size: 2rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    #tray.empty { font-size: 1.2rem; font-style: italic; opacity: 0.85; }
+    #count { font-size: 1.3rem; margin: 10px 0; }
+
+    .btn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: clamp(1.3rem, 5.5vw, 2rem);
+      color: #6a2cff;
+      background: #fff;
+      border: 4px solid #fff;
+      border-radius: 24px;
+      padding: 14px 34px;
+      margin: 8px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+    .btn.eat { background: #5fff8f; color: #1a6e2e; }
+    .btn.small { font-size: 1rem; padding: 10px 18px; color: #b23; }
+
+    #message { font-size: clamp(1.3rem, 5.5vw, 2.2rem); min-height: 1.5em; margin-top: 12px; text-shadow: 2px 2px 0 rgba(0,0,0,0.18); }
+
+    .crumb {
+      position: fixed;
+      font-size: 1.8rem;
+      pointer-events: none;
+      z-index: 9;
+      animation: poof 0.9s ease-out forwards;
+    }
+    @keyframes poof {
+      to { transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(180deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🍟 Snack Shack Order! 🍗</h1>
+  <p class="sub">Tap food to add it to your tray, then tap EAT IT!</p>
+
+  <div class="menu" id="menu"></div>
+
+  <div id="count">Items on tray: 0</div>
+  <div id="tray" class="empty">Your tray is empty — tap some food! 👆</div>
+
+  <div>
+    <button class="btn eat" id="eatBtn">😋 EAT IT!</button>
+    <button class="btn small" id="clearBtn">Clear Tray</button>
+  </div>
+
+  <div id="message"></div>
+
+  <script>
+    var MENU = [
+      { emo: "🍗", nm: "30 Nuggets" },
+      { emo: "🍟", nm: "Large Waffle Fry" },
+      { emo: "🍔", nm: "Burger" },
+      { emo: "🌭", nm: "Hot Dog" },
+      { emo: "🍕", nm: "Pizza" },
+      { emo: "🥤", nm: "Big Drink" },
+      { emo: "🍦", nm: "Ice Cream" },
+      { emo: "🍪", nm: "Cookie" }
+    ];
+
+    var tray = [];
+    var menuWrap = document.getElementById("menu");
+    var trayEl = document.getElementById("tray");
+    var countEl = document.getElementById("count");
+    var msg = document.getElementById("message");
+
+    MENU.forEach(function (f) {
+      var b = document.createElement("div");
+      b.className = "food";
+      b.innerHTML = '<div class="emo">' + f.emo + '</div><div class="nm">' + f.nm + '</div>';
+      b.addEventListener("click", function () { addFood(f.emo); });
+      menuWrap.appendChild(b);
+    });
+
+    function addFood(emo) {
+      tray.push(emo);
+      render();
+      msg.textContent = "";
+    }
+    function render() {
+      countEl.textContent = "Items on tray: " + tray.length;
+      if (tray.length === 0) {
+        trayEl.className = "empty";
+        trayEl.textContent = "Your tray is empty — tap some food! 👆";
+      } else {
+        trayEl.className = "";
+        trayEl.textContent = tray.join(" ");
+      }
+    }
+
+    function eat() {
+      if (tray.length === 0) { msg.textContent = "Add some food first! 🍔"; return; }
+      var r = trayEl.getBoundingClientRect();
+      crumbs(r.left + r.width / 2, r.top + r.height / 2, tray.length);
+      var n = tray.length;
+      tray = [];
+      render();
+      msg.textContent = "NOM NOM NOM! You ate " + n + " things! 🤤";
+    }
+
+    function crumbs(x, y, n) {
+      var bits = ["😋", "🤤", "✨", "🍗", "🍟", "💨", "⭐"];
+      var total = Math.min(8 + n * 2, 40);
+      for (var i = 0; i < total; i++) {
+        var c = document.createElement("div");
+        c.className = "crumb";
+        c.textContent = bits[i % bits.length];
+        c.style.left = x + "px";
+        c.style.top = y + "px";
+        var a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 110;
+        c.style.setProperty("--dx", Math.cos(a) * d + "px");
+        c.style.setProperty("--dy", Math.sin(a) * d + "px");
+        document.body.appendChild(c);
+        setTimeout(function (node) { return function () { node.remove(); }; }(c), 900);
+      }
+    }
+
+    document.getElementById("eatBtn").addEventListener("click", eat);
+    document.getElementById("clearBtn").addEventListener("click", function () {
+      tray = []; render(); msg.textContent = "Tray cleared! 🧹";
+    });
+    render();
+  </script>
+</body>
+</html>
