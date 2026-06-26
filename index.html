@@ -637,9 +637,13 @@
         var item = items[it];
         var dx = item.x - guy.x, dy = item.y - guy.y;
         if (Math.sqrt(dx * dx + dy * dy) < 80) {
-          usePickup();
-          makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
-          playPowerup();
+          if (item.type === "wheel") {
+            startWheel(); // spin for a random prize!
+          } else {
+            usePickup();
+            makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
+            playPowerup();
+          }
           items.splice(it, 1);
           break;
         }
@@ -745,6 +749,7 @@
       bossActive = false;
       items.length = 0;
       itemCooldown = 350;
+      wheelActive = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -938,13 +943,14 @@
 
     // Random pickup items — grab one with A to pop a bunch of balloons!
     function spawnItem() {
-      var emojis = ["💣", "⚡", "⭐", "🎁"];
-      items.push({
-        x: 60 + Math.random() * (W - 120),
-        y: 90 + Math.random() * (H - 240),
-        born: Date.now(),
-        emoji: emojis[Math.floor(Math.random() * emojis.length)]
-      });
+      var x = 60 + Math.random() * (W - 120);
+      var y = 90 + Math.random() * (H - 240);
+      if (Math.random() < 0.3) {
+        items.push({ x: x, y: y, born: Date.now(), type: "wheel" }); // yellow circle = prize wheel
+      } else {
+        var emojis = ["💣", "⚡", "⭐", "🎁"];
+        items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
+      }
     }
     // Using a pickup pops a bunch of balloons (and dings the boss once)
     function usePickup() {
@@ -967,6 +973,25 @@
       }
       if (gained > 0) bumpScore();
       playBoom();
+    }
+
+    // ---- The PRIZE WHEEL (from the yellow circle item) ----
+    var TWO_PI = Math.PI * 2;
+    var wheelActive = false;
+    var wheelAngle = 0;
+    var wheelVel = 0;
+    var WHEEL_REWARDS = [
+      { emoji: "💣", label: "POP-A-RAMA!", color: "#ff5fa2", apply: function () { usePickup(); } },
+      { emoji: "❤️", label: "+1 LIFE",     color: "#3fd0ff", apply: function () { lives += 1; updateLives(); } },
+      { emoji: "💞", label: "+2 LIVES",    color: "#ff8f3f", apply: function () { lives += 2; updateLives(); } },
+      { emoji: "⭐", label: "+50 POINTS",  color: "#8a5cff", apply: function () { score += 50; bumpScore(); } },
+      { emoji: "🌈", label: "RAINBOW!",    color: "#5fff8f", apply: function () { rainbowMode = true; } },
+      { emoji: "🔥", label: "GIANT MODE!", color: "#ffd23f", apply: function () { fireMode = true; fireUntil = Date.now() + 22000; } }
+    ];
+    function startWheel() {
+      wheelActive = true;
+      wheelAngle = Math.random() * TWO_PI;
+      wheelVel = 0.26 + Math.random() * 0.16; // random spin speed = random result
     }
 
     // The BOSS balloon — giant, takes 5 shots, comes with a swarm of tiny ones
@@ -1123,7 +1148,7 @@
     setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
 
     function shoot(big) {
-      if (gameOver || paused || dying) return; // no shooting when over/paused/dying
+      if (gameOver || paused || dying || wheelActive) return; // no shooting then
       // If they tried a super shot but it's empty/recharging, fire a normal bullet
       if (big && (Date.now() < superLockedUntil || superUsed >= SUPER_MAX)) {
         big = false;
@@ -1201,6 +1226,55 @@
         ctx.fillText("⏸ PAUSED", W / 2, H / 2);
         ctx.font = "bold 24px 'Comic Sans MS', sans-serif";
         ctx.fillText("Press P or the Play button to keep going!", W / 2, H / 2 + 50);
+        requestAnimationFrame(loop);
+        return;
+      }
+
+      // The PRIZE WHEEL is spinning — freeze the game and draw it
+      if (wheelActive) {
+        wheelAngle += wheelVel;
+        wheelVel *= 0.985; // slow down
+
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(40, 10, 80, 0.85)";
+        ctx.fillRect(0, 0, W, H);
+        var cxw = W / 2, cyw = H / 2, rad = Math.min(W, H) * 0.32;
+        var n = WHEEL_REWARDS.length, seg = TWO_PI / n;
+        for (var s = 0; s < n; s++) {
+          var a0 = wheelAngle + s * seg, a1 = a0 + seg;
+          ctx.fillStyle = WHEEL_REWARDS[s].color;
+          ctx.beginPath();
+          ctx.moveTo(cxw, cyw);
+          ctx.arc(cxw, cyw, rad, a0, a1);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+          // emoji in the middle of the slice
+          var am = a0 + seg / 2;
+          ctx.fillStyle = "#fff";
+          ctx.font = "34px 'Comic Sans MS', sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(WHEEL_REWARDS[s].emoji, cxw + Math.cos(am) * rad * 0.65, cyw + Math.sin(am) * rad * 0.65 + 12);
+        }
+        // pointer at the top
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.moveTo(cxw, cyw - rad - 22);
+        ctx.lineTo(cxw - 16, cyw - rad + 6);
+        ctx.lineTo(cxw + 16, cyw - rad + 6);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 30px 'Comic Sans MS', sans-serif";
+        ctx.fillText("🎡 PRIZE WHEEL!", cxw, cyw - rad - 36);
+
+        if (wheelVel < 0.003) { // stopped — figure out where the pointer landed
+          wheelActive = false;
+          var rel = ((-Math.PI / 2 - wheelAngle) % TWO_PI + TWO_PI) % TWO_PI;
+          var idx = Math.floor(rel / seg) % n;
+          var reward = WHEEL_REWARDS[idx];
+          reward.apply();
+          makeFloater(W / 2, H / 2 - rad - 70, reward.label, "#ffd23f");
+          playPowerup();
+        }
         requestAnimationFrame(loop);
         return;
       }
@@ -1767,7 +1841,17 @@
       for (var it = items.length - 1; it >= 0; it--) {
         var item = items[it];
         if (Date.now() - item.born > 15000) { items.splice(it, 1); continue; } // fades after 15s
-        ctx.fillText(item.emoji, item.x, item.y);
+        if (item.type === "wheel") {
+          // a glowing yellow circle (the prize wheel item)
+          ctx.fillStyle = "#ffd23f";
+          ctx.beginPath(); ctx.arc(item.x, item.y, 18, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 18, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = "#b8860b"; ctx.beginPath(); ctx.arc(item.x, item.y, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.font = "36px 'Comic Sans MS', sans-serif";
+          ctx.fillText(item.emoji, item.x, item.y);
+        }
         // show "Press A!" when the guy is close enough to grab it
         var idx = item.x - guy.x, idy = item.y - guy.y;
         if (guy.x > 0 && Math.sqrt(idx * idx + idy * idy) < 80) {
