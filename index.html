@@ -1008,8 +1008,18 @@
 
     // Random pickup items — grab one with A to pop a bunch of balloons!
     function spawnItem() {
-      var x = 60 + Math.random() * (W - 120);
-      var y = 90 + Math.random() * (H - 240);
+      // pick a spot that isn't too close to a deadly RED block
+      var blocks = getWalls();
+      var x, y, ok = false, tries = 0;
+      while (!ok && tries < 30) {
+        x = 60 + Math.random() * (W - 120);
+        y = 90 + Math.random() * (H - 240);
+        ok = true;
+        for (var bi = 0; bi < blocks.length; bi++) {
+          if (blocks[bi].red && circleRectOverlap(x, y, 70, blocks[bi])) { ok = false; break; }
+        }
+        tries++;
+      }
       var roll = Math.random();
       if (roll < 0.22) {
         items.push({ x: x, y: y, born: Date.now(), type: "wheel" });   // yellow circle = prize wheel
