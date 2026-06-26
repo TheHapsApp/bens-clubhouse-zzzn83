@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Build-A-Burger!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #ff8f3f, #ffd23f, #5fff8f);
+      background-size: 300% 300%;
+      animation: flow 12s ease infinite;
+      padding: 20px 12px 50px;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 { font-size: clamp(1.7rem, 6.5vw, 3rem); text-shadow: 3px 3px 0 rgba(0,0,0,0.2); }
+    h2 { font-size: clamp(1.1rem, 4vw, 1.5rem); margin: 16px 0 6px; text-shadow: 2px 2px 0 rgba(0,0,0,0.15); }
+
+    .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 640px; margin: 0 auto; }
+    .chip {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1.05rem;
+      color: #6a2cff;
+      background: #fff;
+      border: 3px solid #fff;
+      border-radius: 18px;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+    }
+    .chip:active { transform: translateY(2px); box-shadow: none; }
+    .chip.on { background: #ffd23f; color: #a04; border-color: #a04; transform: scale(1.05); }
+
+    /* the live burger preview */
+    #preview {
+      margin: 16px auto;
+      max-width: 420px;
+      background: rgba(255,255,255,0.2);
+      border: 5px dashed #fff;
+      border-radius: 24px;
+      padding: 16px;
+    }
+    #stack { font-size: clamp(2.2rem, 11vw, 3.4rem); line-height: 1.15; }
+    #sides { font-size: clamp(2.6rem, 14vw, 4rem); margin-top: 6px; }
+    #orderText { font-size: 1rem; margin-top: 8px; opacity: 0.95; }
+
+    .btn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: clamp(1.2rem, 5vw, 1.8rem);
+      color: #1a6e2e;
+      background: #5fff8f;
+      border: 4px solid #fff;
+      border-radius: 24px;
+      padding: 14px 30px;
+      margin: 14px 8px 0;
+      cursor: pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.22);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.22); }
+    .btn.small { font-size: 1rem; color: #b23; background: #fff; padding: 10px 18px; }
+
+    #message { font-size: clamp(1.3rem, 5.5vw, 2.1rem); min-height: 1.5em; margin-top: 12px; text-shadow: 2px 2px 0 rgba(0,0,0,0.18); }
+
+    .confetti { position: fixed; font-size: 1.8rem; top: -40px; z-index: 9; pointer-events: none; animation: fall 2.4s linear forwards; }
+    @keyframes fall { to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; } }
+  </style>
+</head>
+<body>
+  <h1>🍔 Build-A-Burger! 🍟</h1>
+
+  <h2>1. Pick your burger</h2>
+  <div class="row" id="baseRow"></div>
+
+  <h2>2. Add toppings 🥬</h2>
+  <div class="row" id="topRow"></div>
+
+  <h2>3. Pick a side 🍟</h2>
+  <div class="row" id="sideRow"></div>
+
+  <h2>4. Pick a drink 🥤</h2>
+  <div class="row" id="drinkRow"></div>
+
+  <div id="preview">
+    <div id="stack"></div>
+    <div id="sides"></div>
+    <div id="orderText"></div>
+  </div>
+
+  <button class="btn" id="serveBtn">🍽️ Serve my meal!</button>
+  <button class="btn small" id="resetBtn">Start Over</button>
+  <div id="message"></div>
+
+  <script>
+    var BASES = [
+      { id: "ham", label: "Hamburger 🍔", cheese: false },
+      { id: "cheese", label: "Cheeseburger 🧀", cheese: true }
+    ];
+    var TOPPINGS = [
+      { e: "🥬", n: "Lettuce" }, { e: "🍅", n: "Tomato" }, { e: "🧅", n: "Onion" },
+      { e: "🥒", n: "Pickle" }, { e: "🥓", n: "Bacon" }, { e: "🍄", n: "Mushroom" },
+      { e: "🥚", n: "Egg" }, { e: "🌶️", n: "Hot Sauce" }
+    ];
+    var SIDES = [ { e: "🍟", n: "Fries" }, { e: "🧅", n: "Onion Rings" } ];
+    var DRINKS = [ { e: "🥤", n: "Soda" }, { e: "🧃", n: "Juice" }, { e: "🥛", n: "Milk" }, { e: "💧", n: "Water" } ];
+
+    var state = { base: "cheese", toppings: [], side: "🍟", drink: "🥤" };
+
+    function makeChips(rowId, list, isSelected, onClick) {
+      var row = document.getElementById(rowId);
+      row.innerHTML = "";
+      list.forEach(function (item) {
+        var b = document.createElement("button");
+        b.className = "chip" + (isSelected(item) ? " on" : "");
+        b.textContent = item.label || (item.e + " " + item.n);
+        b.addEventListener("click", function () { onClick(item); rebuild(); });
+        row.appendChild(b);
+      });
+    }
+
+    function rebuild() {
+      makeChips("baseRow", BASES, function (b) { return state.base === b.id; },
+        function (b) { state.base = b.id; });
+      makeChips("topRow", TOPPINGS, function (t) { return state.toppings.indexOf(t.e) > -1; },
+        function (t) {
+          var i = state.toppings.indexOf(t.e);
+          if (i > -1) state.toppings.splice(i, 1); else state.toppings.push(t.e);
+        });
+      makeChips("sideRow", SIDES, function (s) { return state.side === s.e; },
+        function (s) { state.side = s.e; });
+      makeChips("drinkRow", DRINKS, function (d) { return state.drink === d.e; },
+        function (d) { state.drink = d.e; });
+      drawPreview();
+    }
+
+    function drawPreview() {
+      var cheese = state.base === "cheese";
+      // stack from top bun down to bottom bun
+      var lines = ["🍞"]; // top bun
+      state.toppings.forEach(function (e) { lines.push(e); });
+      if (cheese) lines.push("🧀");
+      lines.push("🍖"); // the patty
+      lines.push("🍞"); // bottom bun
+      document.getElementById("stack").innerHTML = lines.join("<br>");
+      document.getElementById("sides").textContent = state.side + " " + state.drink;
+      var name = cheese ? "Cheeseburger" : "Hamburger";
+      var tops = state.toppings.length ? " with " + state.toppings.join("") : " (plain)";
+      document.getElementById("orderText").textContent = name + tops;
+    }
+
+    function serve() {
+      var cheese = state.base === "cheese";
+      var name = cheese ? "cheeseburger" : "hamburger";
+      document.getElementById("message").textContent = "🍽️ One " + name + ", " +
+        sideName(state.side) + " and a drink — enjoy! 😋";
+      party();
+    }
+    function sideName(e) { var s = SIDES.filter(function (x) { return x.e === e; })[0]; return s ? s.n.toLowerCase() : "fries"; }
+
+    function party() {
+      var em = ["🍔", "🍟", "🥤", "🎉", "😋", "🧀", "⭐"];
+      for (var i = 0; i < 36; i++) {
+        var c = document.createElement("div");
+        c.className = "confetti";
+        c.textContent = em[i % em.length];
+        c.style.left = Math.random() * 100 + "vw";
+        c.style.animationDelay = (Math.random() * 0.8) + "s";
+        document.body.appendChild(c);
+        setTimeout(function (node) { return function () { node.remove(); }; }(c), 3400);
+      }
+    }
+
+    document.getElementById("serveBtn").addEventListener("click", serve);
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      state = { base: "cheese", toppings: [], side: "🍟", drink: "🥤" };
+      document.getElementById("message").textContent = "";
+      rebuild();
+    });
+
+    rebuild();
+  </script>
+</body>
+</html>
