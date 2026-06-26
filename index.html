@@ -777,6 +777,7 @@
       holdingBall = false;
       thrownBalls.length = 0;
       chompers.length = 0;
+      wallHoles = {};
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -876,6 +877,20 @@
         { x: W * 0.14, y: H * 0.80, w: 55, h: 55, red: true }
       ];
     }
+    // Holes punched in brown walls by super shots (keyed by wall index)
+    var wallHoles = {};
+    // Draw one piece of a brown brick wall
+    function drawBrownWallPiece(x, y, w, h) {
+      if (w <= 0) return;
+      ctx.fillStyle = "#5a3a1a"; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = "#caa06a"; ctx.fillRect(x, y, w, 6);
+      ctx.strokeStyle = "#2b1c0c"; ctx.lineWidth = 4; ctx.strokeRect(x, y, w, h);
+      ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 2;
+      for (var bx = x + 24; bx < x + w; bx += 24) {
+        ctx.beginPath(); ctx.moveTo(bx, y); ctx.lineTo(bx, y + h); ctx.stroke();
+      }
+    }
+
     // Does a circle (cx,cy,r) overlap a rectangle?
     function circleRectOverlap(cx, cy, r, rc) {
       var nx = Math.max(rc.x, Math.min(cx, rc.x + rc.w));
@@ -1478,7 +1493,7 @@
 
       // ---- Walls + the danger wave ----
       var walls = getWalls();
-      walls.forEach(function (wl) {
+      walls.forEach(function (wl, wallIndex) {
         if (wl.red) {
           ctx.fillStyle = (tick % 16 < 8) ? "#e01010" : "#b00000"; // glowing red
           ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
@@ -1495,17 +1510,16 @@
             ctx.stroke();
           }
         } else {
-          ctx.fillStyle = "#5a3a1a";                 // brown brick
-          ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
-          ctx.fillStyle = "#caa06a";                 // lighter top edge
-          ctx.fillRect(wl.x, wl.y, wl.w, 6);
-          ctx.strokeStyle = "#2b1c0c";               // dark outline
-          ctx.lineWidth = 4;
-          ctx.strokeRect(wl.x, wl.y, wl.w, wl.h);
-          ctx.strokeStyle = "rgba(0,0,0,0.3)";       // brick lines
-          ctx.lineWidth = 2;
-          for (var bx = wl.x + 24; bx < wl.x + wl.w; bx += 24) {
-            ctx.beginPath(); ctx.moveTo(bx, wl.y); ctx.lineTo(bx, wl.y + wl.h); ctx.stroke();
+          var hole = wallHoles[wallIndex];
+          if (hole && Date.now() < hole.until) {
+            // a super shot punched a hole — draw the wall in two pieces
+            var hcx = Math.max(wl.x + 10, Math.min(hole.x, wl.x + wl.w - 10));
+            var hL = Math.max(wl.x, hcx - 22), hR = Math.min(wl.x + wl.w, hcx + 22);
+            drawBrownWallPiece(wl.x, wl.y, hL - wl.x, wl.h);
+            drawBrownWallPiece(hR, wl.y, (wl.x + wl.w) - hR, wl.h);
+          } else {
+            if (hole) delete wallHoles[wallIndex]; // healed up
+            drawBrownWallPiece(wl.x, wl.y, wl.w, wl.h);
           }
         }
       });
@@ -1696,11 +1710,15 @@
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
         bu.y += bu.speed * (bu.dir || -1); // dir -1 = up, +1 = down
-        // Bounce off the brown walls (red walls let bullets pass through)
+        // Small bullets bounce off brown walls; SUPER shots punch through (making a hole)
         for (var bw = 0; bw < walls.length; bw++) {
           var wbl = walls[bw];
           if (wbl.red) continue; // straight through red walls
-          if (circleRectOverlap(bu.x, bu.y, bu.r, wbl)) {
+          if (!circleRectOverlap(bu.x, bu.y, bu.r, wbl)) continue;
+          if (bu.big) {
+            wallHoles[bw] = { x: bu.x, until: Date.now() + 2500 }; // punch a hole that heals
+            // pass straight through — no bounce
+          } else {
             bu.dir = (bu.dir || -1) * -1; // flip up/down
             bu.y = (bu.dir < 0) ? (wbl.y - bu.r - 1) : (wbl.y + wbl.h + bu.r + 1);
             bu.bounces = (bu.bounces || 0) + 1;
