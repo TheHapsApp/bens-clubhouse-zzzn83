@@ -299,6 +299,7 @@
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
+    <p class="gamehint">🎁 Fly to a pickup item and press A to pop a bunch of balloons at once!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
@@ -628,6 +629,23 @@
       if (e.key === "m" || e.key === "M") toggleMusic();
     });
 
+    // Press A to grab a nearby pickup item
+    window.addEventListener("keydown", function (e) {
+      if (e.key !== "a" && e.key !== "A") return;
+      if (gameOver || paused || dying || !started) return;
+      for (var it = items.length - 1; it >= 0; it--) {
+        var item = items[it];
+        var dx = item.x - guy.x, dy = item.y - guy.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 80) {
+          usePickup();
+          makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
+          playPowerup();
+          items.splice(it, 1);
+          break;
+        }
+      }
+    });
+
     // ---- Pause the whole game + music ----
     var paused = false;
     var pauseStart = 0;
@@ -648,6 +666,7 @@
         fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta;
         dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
         for (var hi = 0; hi < hearts.length; hi++) hearts[hi].born += delta; // hearts wait too
+        for (var ii = 0; ii < items.length; ii++) items[ii].born += delta;   // items wait too
         if (pauseMusicWasOn) startMusic();
       }
     }
@@ -674,6 +693,8 @@
     var popCount = 0;     // how many balloons you've popped
     var nextBossAt = 100; // a boss appears every 100 pops
     var bossActive = false;
+    var items = [];          // pickups — fly near one and press A to use it
+    var itemCooldown = 350;  // frames until the next item appears
 
     function spawnHeart(x, y, value) {
       value = value || 1; // 1 = ❤️ (one life), 2 = 💞 (two lives)
@@ -722,6 +743,8 @@
       popCount = 0;
       nextBossAt = 100;
       bossActive = false;
+      items.length = 0;
+      itemCooldown = 350;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -911,6 +934,39 @@
     for (var i = 0; i < 8; i++) {
       spawnBalloon();
       balloons[i].y = Math.random() * H; // start scattered
+    }
+
+    // Random pickup items — grab one with A to pop a bunch of balloons!
+    function spawnItem() {
+      var emojis = ["💣", "⚡", "⭐", "🎁"];
+      items.push({
+        x: 60 + Math.random() * (W - 120),
+        y: 90 + Math.random() * (H - 240),
+        born: Date.now(),
+        emoji: emojis[Math.floor(Math.random() * emojis.length)]
+      });
+    }
+    // Using a pickup pops a bunch of balloons (and dings the boss once)
+    function usePickup() {
+      var gained = 0;
+      for (var k = balloons.length - 1; k >= 0; k--) {
+        var bal = balloons[k];
+        var bcx = bal.drawX || bal.x;
+        if (bal.boss) {
+          bal.hp -= 1;
+          makeSparkles(bcx, bal.y, "#fff", 10);
+          if (bal.hp <= 0) {
+            balloons.splice(k, 1); score += 25; gained++; popCount++;
+            bossActive = false; spawnHeart(bcx, bal.y, 2);
+          }
+          continue;
+        }
+        makeSparkles(bcx, bal.y, bal.color);
+        makeFloater(bcx, bal.y, "+2", "#ffd23f");
+        balloons.splice(k, 1); score += 2; gained++; popCount++;
+      }
+      if (gained > 0) bumpScore();
+      playBoom();
     }
 
     // The BOSS balloon — giant, takes 5 shots, comes with a swarm of tiny ones
@@ -1687,6 +1743,30 @@
             hearts.splice(ht, 1);
             continue;
           }
+        }
+      }
+
+      // Spawn + draw the pickup items (grab with A)
+      if (!gameOver) {
+        itemCooldown--;
+        if (itemCooldown <= 0) { spawnItem(); itemCooldown = 650 + Math.floor(Math.random() * 500); }
+      }
+      ctx.font = "36px 'Comic Sans MS', sans-serif";
+      ctx.textAlign = "center";
+      for (var it = items.length - 1; it >= 0; it--) {
+        var item = items[it];
+        if (Date.now() - item.born > 15000) { items.splice(it, 1); continue; } // fades after 15s
+        ctx.fillText(item.emoji, item.x, item.y);
+        // show "Press A!" when the guy is close enough to grab it
+        var idx = item.x - guy.x, idy = item.y - guy.y;
+        if (guy.x > 0 && Math.sqrt(idx * idx + idy * idy) < 80) {
+          ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
+          ctx.fillStyle = "#ffd23f";
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 3;
+          ctx.strokeText("Press A!", item.x, item.y - 28);
+          ctx.fillText("Press A!", item.x, item.y - 28);
+          ctx.font = "36px 'Comic Sans MS', sans-serif";
         }
       }
 
