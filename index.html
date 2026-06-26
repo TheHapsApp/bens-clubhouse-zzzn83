@@ -675,8 +675,9 @@
     var nextBossAt = 100; // a boss appears every 100 pops
     var bossActive = false;
 
-    function spawnHeart(x, y) {
-      hearts.push({ x: x, y: y, born: Date.now() }); // stays still, 30s to grab it
+    function spawnHeart(x, y, value) {
+      value = value || 1; // 1 = ❤️ (one life), 2 = 💞 (two lives)
+      hearts.push({ x: x, y: y, born: Date.now(), value: value, emoji: value === 2 ? "💞" : "❤️" });
     }
     var score = 0;
     var lives = 12;
@@ -1595,7 +1596,7 @@
                 balloons.splice(k, 1);
                 score += 25; bumpScore(); popCount++;
                 bossActive = false;
-                spawnHeart(bcx, bal.y); spawnHeart(bcx + 16, bal.y);
+                spawnHeart(bcx, bal.y, 2); // a 💞 worth two lives
               }
               if (!bu.big) { bullets.splice(j, 1); bulletGone = true; break; }
               continue; // big bullet keeps going
@@ -1609,10 +1610,10 @@
             score += bu.points;
             bumpScore();
             popCount++;
-            // Sometimes a popped balloon drops a heart (or even two!)
+            // Sometimes a popped balloon drops a heart ❤️ (or a 💞 worth two!)
             var hr = Math.random();
-            if (hr < 0.04)      { spawnHeart(bal.drawX || bal.x, bal.y); spawnHeart((bal.drawX || bal.x) + 14, bal.y); }
-            else if (hr < 0.12) { spawnHeart(bal.drawX || bal.x, bal.y); }
+            if (hr < 0.04)      { spawnHeart(bcx, bal.y, 2); } // one 💞 = 2 lives
+            else if (hr < 0.12) { spawnHeart(bcx, bal.y, 1); } // one ❤️ = 1 life
             if (!bu.big) { // small bullets stop at the first balloon...
               bullets.splice(j, 1);
               bulletGone = true;
@@ -1674,14 +1675,14 @@
         var visible = true;
         if (age >= 25000)      visible = (tick % 10 < 5);  // 25s+ : fast flash
         else if (age >= 20000) visible = (tick % 24 < 12); // 20s+ : slow flash
-        if (visible) ctx.fillText("❤️", hd.x, hd.y);
+        if (visible) ctx.fillText(hd.emoji, hd.x, hd.y);
         // collected by the guy? (works even while flashing)
         if (guy.x > 0 && !dying && !gameOver) {
           var hdx = hd.x - guy.x, hdy = hd.y - guy.y;
           if (Math.sqrt(hdx * hdx + hdy * hdy) < 22 + gw / 2) {
-            lives += 1;
+            lives += hd.value;
             updateLives();
-            makeFloater(hd.x, hd.y, "+1 LIFE", "#ff5fa2");
+            makeFloater(hd.x, hd.y, hd.value === 2 ? "+2 LIVES" : "+1 LIFE", "#ff5fa2");
             playPowerup();
             hearts.splice(ht, 1);
             continue;
