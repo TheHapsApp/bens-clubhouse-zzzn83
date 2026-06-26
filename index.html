@@ -303,6 +303,7 @@
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
+    <p class="gamehint">🔵 SUPER-shot the blue/red/white/yellow ball to go big + blue — TOUCH balloons to pop them in a chain reaction!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <p class="gamehint">🎁 Fly to a pickup item and press A to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴 clone ball (press T to throw!)</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
@@ -604,7 +605,7 @@
       var ac = ensureAudio(); if (!ac) return;
 
       // While powered up, play the wild chaotic music; otherwise the adventure playlist
-      var poweredUp = rainbowMode || fireMode || ultimateActive;
+      var poweredUp = rainbowMode || fireMode || ultimateActive || blueMode;
       var song = poweredUp ? chaosSong : songs[musicBar % songs.length];
       var lead = song.lead, bass = song.bass, step = song.step;
 
@@ -728,10 +729,10 @@
     var clones = [];         // helper clones of you that auto-pop balloons
 
     function spawnClones(x, y) {
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 5; i++) { // 5 clones, spread out far
         clones.push({
-          x: x + (Math.random() * 80 - 40),
-          y: y + (Math.random() * 80 - 40),
+          x: Math.max(20, Math.min(W - 20, x + (Math.random() * 500 - 250))),
+          y: Math.max(20, Math.min(H - 20, y + (Math.random() * 500 - 250))),
           vx: 0, vy: 0,
           born: Date.now(),
           shootTimer: 10 + Math.floor(Math.random() * 25)
@@ -781,6 +782,9 @@
       fireBall = null;
       fireMode = false;
       fireCooldown = 800;
+      multiBall = null;
+      blueMode = false;
+      multiCooldown = 900;
       escapingBalls.length = 0;
       dangerBalloons.length = 0;
       dangerCooldown = 700;
@@ -1178,6 +1182,48 @@
       };
     }
 
+    // ---- The blue power-up ball (touch + chain reaction) ----
+    var multiBall = null;
+    var blueMode = false;     // big + blue; touch balloons to pop them with a chain
+    var blueUntil = 0;
+    var multiCooldown = 900;
+    var MULTI_COLORS = ["#3f62ff", "#ff2a2a", "#ffffff", "#ffd23f"]; // blue red white yellow
+
+    function spawnMultiBall() {
+      multiBall = {
+        x: 80 + Math.random() * (W - 160),
+        y: 120 + Math.random() * (H - 240),
+        r: 38,
+        vx: (Math.random() < 0.5 ? -1 : 1) * 1.8,
+        vy: (Math.random() < 0.5 ? -1 : 1) * 1.4
+      };
+    }
+
+    // Pop a balloon and chain-pop the balloons next to it (and their neighbors!)
+    function chainPop(start) {
+      var toPop = [start], poppedList = [];
+      while (toPop.length) {
+        var b = toPop.pop();
+        var idx = balloons.indexOf(b);
+        if (idx === -1 || b.boss) continue;
+        balloons.splice(idx, 1);
+        poppedList.push(b);
+        var bxp = b.drawX || b.x;
+        for (var i = 0; i < balloons.length; i++) {
+          if (balloons[i].boss) continue;
+          var dx = (balloons[i].drawX || balloons[i].x) - bxp;
+          var dy = balloons[i].y - b.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 95) toPop.push(balloons[i]);
+        }
+      }
+      poppedList.forEach(function (b) {
+        makeSparkles(b.drawX || b.x, b.y, b.color);
+        makeFloater(b.drawX || b.x, b.y, "+2", "#3f62ff");
+        score += 2; popCount++;
+      });
+      if (poppedList.length) { bumpScore(); playPop(); }
+    }
+
     // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
     var isCharging = false;
     var chargeStart = 0;
@@ -1378,6 +1424,8 @@
 
       // Fire mode wears off after its timer
       if (fireMode && Date.now() > fireUntil) fireMode = false;
+      // Blue (touch + chain) mode wears off after its timer
+      if (blueMode && Date.now() > blueUntil) blueMode = false;
 
       // Death burst finished → show Game Over
       if (dying && Date.now() > dyingUntil) { dying = false; triggerGameOver(); }
@@ -1433,7 +1481,7 @@
       var guySafe = guyIsSafe();
 
       // The guy (and his hitbox) is bigger while fire mode is on
-      var sizeMul = ultimateActive ? 3.4 : (fireMode ? 1.9 : 1);
+      var sizeMul = ultimateActive ? 3.4 : (blueMode ? 2.4 : (fireMode ? 1.9 : 1));
       var gw = guy.w * sizeMul;
       var gh = guy.h * sizeMul;
 
@@ -1505,7 +1553,7 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying &&
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying && !blueMode &&
             Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
@@ -1524,6 +1572,19 @@
         }
 
         if (b.y + b.r < -30) { if (b.boss) bossActive = false; balloons.splice(i, 1); } // off top
+      }
+
+      // BLUE MODE: touch a balloon to pop it — and it chain-pops the ones nearby!
+      if (blueMode && guy.x > 0 && !dying && !gameOver) {
+        for (var tbp = 0; tbp < balloons.length; tbp++) {
+          if (balloons[tbp].boss) continue;
+          var tdx = (balloons[tbp].drawX || balloons[tbp].x) - guy.x;
+          var tdy = balloons[tbp].y - guy.y;
+          if (Math.sqrt(tdx * tdx + tdy * tdy) < gw / 2 + balloons[tbp].r) {
+            chainPop(balloons[tbp]);
+            break; // one chain per frame
+          }
+        }
       }
 
       // ---- Walls + the danger wave ----
@@ -1716,6 +1777,25 @@
         }
       }
 
+      // ---- Blue ball: spawn, move, draw (blue/red/white/yellow rings) ----
+      if (!gameOver && !multiBall && !blueMode) {
+        multiCooldown--;
+        if (multiCooldown <= 0) spawnMultiBall();
+      }
+      if (multiBall) {
+        var mb2 = multiBall;
+        mb2.x += mb2.vx; mb2.y += mb2.vy;
+        if (mb2.x < mb2.r || mb2.x > W - mb2.r) mb2.vx *= -1;
+        if (mb2.y < mb2.r || mb2.y > H - mb2.r) mb2.vy *= -1;
+        bounceBallOffWalls(mb2, walls);
+        for (var mr = 4; mr >= 1; mr--) {
+          ctx.fillStyle = MULTI_COLORS[mr - 1];
+          ctx.beginPath();
+          ctx.arc(mb2.x, mb2.y, mb2.r * mr / 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       // ---- Balls that float away after you lose a power-up ----
       for (var eb = escapingBalls.length - 1; eb >= 0; eb--) {
         var e = escapingBalls[eb];
@@ -1800,8 +1880,21 @@
             fireBall = null;
             fireCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
-            if (rainbowMode || fireMode) { triggerUltimate(); } // already powered = ULTIMATE!
+            if (rainbowMode || fireMode || blueMode) { triggerUltimate(); } // already powered = ULTIMATE!
             else { fireMode = true; fireUntil = Date.now() + 22000; playPowerup(); }
+          }
+        }
+
+        // A SUPER shot hitting the BLUE ball turns the guy big + blue (touch + chain!)
+        if (multiBall && bu.big) {
+          var mdx = bu.x - multiBall.x;
+          var mdy = bu.y - multiBall.y;
+          if (Math.sqrt(mdx * mdx + mdy * mdy) < multiBall.r + bu.r) {
+            multiBall = null;
+            multiCooldown = 800 + Math.floor(Math.random() * 600);
+            explode(bu.x, bu.y);
+            if (rainbowMode || fireMode || blueMode) { triggerUltimate(); }
+            else { blueMode = true; blueUntil = Date.now() + 15000; playPowerup(); }
           }
         }
 
@@ -2059,7 +2152,7 @@
       // Clone helpers — little copies of you that chase + shoot balloons
       for (var cl = clones.length - 1; cl >= 0; cl--) {
         var cln = clones[cl];
-        if (Date.now() - cln.born > 12000) { clones.splice(cl, 1); continue; } // last ~12s
+        if (Date.now() - cln.born > 60000) { clones.splice(cl, 1); continue; } // last 1 minute
         // find nearest balloon to chase + shoot
         var cltarget = null, clbest = Infinity;
         for (var li = 0; li < balloons.length; li++) {
@@ -2122,8 +2215,9 @@
       var jy = trying ? (Math.random() * 12 - 6) : 0;
       var cx = guy.x + jx;                 // jittered draw position
       var gy = guy.y - gh / 2 + jy;        // top of the triangle
-      // Ultimate = flashing red/white, then fire/trying = yellow, rainbow, else white
+      // Ultimate = flashing red/white, blue mode = blue, fire/trying = yellow, rainbow, else white
       if (ultimateActive)   ctx.fillStyle = (tick % 6 < 3) ? "#ff2a2a" : "#ffffff"; // flash!
+      else if (blueMode)    ctx.fillStyle = "#3f62ff"; // big blue
       else if (fireMode)    ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
       else if (trying)      ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // trying = yellow
       else if (rainbowMode) ctx.fillStyle = "hsl(" + (tick * 8 % 360) + ", 95%, 60%)";
