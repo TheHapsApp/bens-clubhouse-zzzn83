@@ -1424,10 +1424,10 @@
       if (!gameOver) {
         spawnTimer++;
         if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
-        // Every 100 balloons, a BOSS shows up!
+        // Every 100 balloons, a BOSS shows up (just one, even if you overshoot)
         if (!bossActive && popCount >= nextBossAt) {
           spawnBoss();
-          nextBossAt += 100;
+          while (nextBossAt <= popCount) nextBossAt += 100; // skip past the current count
         }
       }
 
