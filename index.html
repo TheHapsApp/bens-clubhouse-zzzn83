@@ -305,7 +305,8 @@
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🔵 SUPER-shot the blue/red/white/yellow ball to go big + blue — TOUCH balloons to pop them in a chain reaction!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
-    <p class="gamehint">🎁 Fly to a pickup item and press A to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴 clone ball (press T to throw!)</p>
+    <p class="gamehint">🎁 Fly to a pickup item and RIGHT-CLICK to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴🟣🌈 clone balls (press T to throw!)</p>
+    <p class="gamehint">🤖 Rarely a MEGA BOSS appears — you suit up in armor with a giant auto-gun. Blast him to win big!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
@@ -644,9 +645,8 @@
       playShoot();
     });
 
-    // Press A to grab a nearby pickup item
-    window.addEventListener("keydown", function (e) {
-      if (e.key !== "a" && e.key !== "A") return;
+    // Grab a nearby pickup item — used by RIGHT-CLICK
+    function tryPickup() {
       if (gameOver || paused || dying || !started) return;
       for (var it = items.length - 1; it >= 0; it--) {
         var item = items[it];
@@ -683,6 +683,11 @@
           break;
         }
       }
+    }
+    // Right-click anywhere near an item to pick it up
+    window.addEventListener("contextmenu", function (e) {
+      e.preventDefault(); // don't show the browser's right-click menu
+      tryPickup();
     });
 
     // ---- Pause the whole game + music ----
@@ -733,6 +738,13 @@
     var popCount = 0;     // how many balloons you've popped
     var nextBossAt = 100; // a boss appears every 100 pops
     var bossActive = false;
+    var megaBoss = null;     // rare armored boss fight {x,y,vx,vy,hp,maxhp,dirTimer}
+    var autoFireTimer = 0;   // for the oversized armor gun
+
+    function spawnMegaBoss() {
+      bossActive = true;
+      megaBoss = { x: W / 2, y: H * 0.25, vx: 2, vy: 1.4, hp: 25, maxhp: 25, dirTimer: 0 };
+    }
     var items = [];          // pickups — fly near one and press A to use it
     var itemCooldown = 350;  // frames until the next item appears
     var heldType = null;     // null, "chomp" (green ball) or "clone" (red ball); press T to throw
@@ -809,6 +821,7 @@
       popCount = 0;
       nextBossAt = 100;
       bossActive = false;
+      megaBoss = null;
       items.length = 0;
       itemCooldown = 350;
       wheelActive = false;
@@ -1503,6 +1516,7 @@
       var sizeMul = ultimateActive ? 3.4 : (blueMode ? 2.4 : (fireMode ? 1.9 : 1));
       var gw = guy.w * sizeMul;
       var gh = guy.h * sizeMul;
+      var armorMode = megaBoss !== null; // wearing armor + giant gun during the boss fight
 
       // Touching a RED block = lose 3 lives (then bounce back to home base)
       if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying) {
@@ -1528,7 +1542,8 @@
         if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
         // Every 100 balloons, a BOSS shows up (just one, even if you overshoot)
         if (!bossActive && popCount >= nextBossAt) {
-          spawnBoss();
+          if (Math.random() < 0.20) spawnMegaBoss(); // 20% chance = armored boss FIGHT!
+          else spawnBoss();
           while (nextBossAt <= popCount) nextBossAt += 100; // skip past the current count
         }
       }
@@ -1572,7 +1587,7 @@
         // Did this balloon bump into the triangle guy?
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
-        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying && !blueMode &&
+        if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying && !blueMode && !armorMode &&
             Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
@@ -1756,6 +1771,48 @@
         ctx.fillRect(0, 0, W, H);
       }
 
+      // ---- MEGA BOSS fight (you're in armor with a giant gun!) ----
+      if (megaBoss) {
+        var mboss = megaBoss;
+        mboss.dirTimer--;
+        if (mboss.dirTimer <= 0) {
+          var mba = Math.random() * Math.PI * 2;
+          mboss.vx = Math.cos(mba) * 2.4; mboss.vy = Math.sin(mba) * 2.0;
+          mboss.dirTimer = 50 + Math.floor(Math.random() * 60);
+        }
+        mboss.x += mboss.vx; mboss.y += mboss.vy;
+        if (mboss.x < 70 || mboss.x > W - 70) mboss.vx *= -1;
+        if (mboss.y < 70 || mboss.y > H - 70) mboss.vy *= -1;
+        // body
+        ctx.fillStyle = "#5a0d0d";
+        ctx.beginPath(); ctx.arc(mboss.x, mboss.y, 60, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#ff2a2a"; ctx.lineWidth = 5; ctx.stroke();
+        // horns
+        ctx.fillStyle = "#2b0000";
+        ctx.beginPath(); ctx.moveTo(mboss.x - 40, mboss.y - 40); ctx.lineTo(mboss.x - 58, mboss.y - 70); ctx.lineTo(mboss.x - 22, mboss.y - 52); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(mboss.x + 40, mboss.y - 40); ctx.lineTo(mboss.x + 58, mboss.y - 70); ctx.lineTo(mboss.x + 22, mboss.y - 52); ctx.fill();
+        // angry eyes
+        ctx.fillStyle = "#ffd23f";
+        ctx.beginPath(); ctx.arc(mboss.x - 20, mboss.y - 8, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(mboss.x + 20, mboss.y - 8, 8, 0, Math.PI * 2); ctx.fill();
+        // HP bar
+        var bw = 130, bp = mboss.hp / mboss.maxhp;
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(mboss.x - bw / 2, mboss.y - 86, bw, 12);
+        ctx.fillStyle = "#5fff8f"; ctx.fillRect(mboss.x - bw / 2, mboss.y - 86, bw * bp, 12);
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(mboss.x - bw / 2, mboss.y - 86, bw, 12);
+      }
+      // Armor auto-fire: the oversized gun blasts big bullets by itself!
+      if (armorMode && !dying) {
+        autoFireTimer--;
+        if (autoFireTimer <= 0) {
+          var adir = flipped ? 1 : -1;
+          bullets.push({ x: guy.x, y: guy.y + adir * (guy.h / 2 + 8), speed: 11, dir: adir,
+                         r: 16, big: false, color: "#bfc4cc", points: 1 });
+          makeSparkles(guy.x, guy.y + adir * (guy.h / 2 + 8), "#bfc4cc", 4);
+          autoFireTimer = 7;
+        }
+      }
+
       // ---- Rainbow ball: spawn, move, draw ----
       if (!gameOver && !rainbowBall && !rainbowMode) {
         rainbowCooldown--;
@@ -1914,6 +1971,25 @@
             explode(bu.x, bu.y);
             if (rainbowMode || fireMode || blueMode) { triggerUltimate(); }
             else { blueMode = true; blueUntil = Date.now() + 15000; playPowerup(); }
+          }
+        }
+
+        // A bullet hitting the MEGA BOSS damages him!
+        if (megaBoss) {
+          var gbx = bu.x - megaBoss.x, gby = bu.y - megaBoss.y;
+          if (Math.sqrt(gbx * gbx + gby * gby) < 60 + bu.r) {
+            megaBoss.hp -= bu.big ? 3 : 1;
+            makeSparkles(bu.x, bu.y, "#ff2a2a", 8);
+            if (megaBoss.hp <= 0) {
+              // BOSS DEFEATED!
+              for (var ix = 0; ix < 30; ix++) makeSparkles(megaBoss.x, megaBoss.y, "#ffd23f", 6);
+              makeFloater(megaBoss.x, megaBoss.y, "BOSS DEFEATED! +200", "#ffd23f");
+              score += 200; bumpScore();
+              spawnHeart(megaBoss.x, megaBoss.y, 2);
+              playBoom();
+              megaBoss = null; bossActive = false;
+            }
+            if (!bu.big) { bullets.splice(j, 1); continue; } // small bullet is used up
           }
         }
 
@@ -2270,8 +2346,9 @@
       var jy = trying ? (Math.random() * 12 - 6) : 0;
       var cx = guy.x + jx;                 // jittered draw position
       var gy = guy.y - gh / 2 + jy;        // top of the triangle
-      // Ultimate = flashing red/white, blue mode = blue, fire/trying = yellow, rainbow, else white
+      // Ultimate = flashing red/white, armor = gray, blue = blue, fire/trying = yellow, rainbow, else white
       if (ultimateActive)   ctx.fillStyle = (tick % 6 < 3) ? "#ff2a2a" : "#ffffff"; // flash!
+      else if (armorMode)   ctx.fillStyle = "#aab0b8"; // suit of armor
       else if (blueMode)    ctx.fillStyle = "#3f62ff"; // big blue
       else if (fireMode)    ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // bright yellow
       else if (trying)      ctx.fillStyle = "hsl(" + (48 + (tick % 10)) + ", 100%, 55%)"; // trying = yellow
@@ -2305,6 +2382,15 @@
       ctx.fillStyle = "#6a2cff";
       ctx.beginPath(); ctx.arc(cx - gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(cx + gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
+
+      // The oversized armor gun (points the way you shoot)
+      if (armorMode) {
+        var gunDir = flipped ? 1 : -1;
+        ctx.fillStyle = "#5a5f66";
+        ctx.fillRect(guy.x - 7, guy.y + (gunDir > 0 ? gh / 2 : -gh / 2 - 26), 14, 26);
+        ctx.strokeStyle = "#2b2f34"; ctx.lineWidth = 2;
+        ctx.strokeRect(guy.x - 7, guy.y + (gunDir > 0 ? gh / 2 : -gh / 2 - 26), 14, 26);
+      }
 
       // Holding a ball? Show it bobbing over the guy + a reminder
       if (heldType) {
