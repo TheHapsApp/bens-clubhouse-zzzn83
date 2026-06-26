@@ -662,6 +662,14 @@
             heldType = "clone"; // holding the red clone ball
             makeFloater(item.x, item.y, "GOT CLONE BALL! Press T", "#ff2a2a");
             playPowerup();
+          } else if (item.type === "clone50") {
+            heldType = "clone50";
+            makeFloater(item.x, item.y, "50 CLONES! Press T", "#9b30ff");
+            playPowerup();
+          } else if (item.type === "clone100") {
+            heldType = "clone100";
+            makeFloater(item.x, item.y, "100 CLONES!! Press T", "#ffd23f");
+            playPowerup();
           } else {
             usePickup();
             makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
@@ -728,14 +736,14 @@
     var chompers = [];       // big Chompers eating balloons where a ball landed
     var clones = [];         // helper clones of you that auto-pop balloons
 
-    function spawnClones(x, y) {
-      for (var i = 0; i < 5; i++) { // 5 clones, spread out far
+    function spawnClones(count) {
+      for (var i = 0; i < count; i++) { // spread all across the screen
         clones.push({
-          x: Math.max(20, Math.min(W - 20, x + (Math.random() * 500 - 250))),
-          y: Math.max(20, Math.min(H - 20, y + (Math.random() * 500 - 250))),
+          x: 20 + Math.random() * (W - 40),
+          y: 20 + Math.random() * (H - 40),
           vx: 0, vy: 0,
           born: Date.now(),
-          shootTimer: 10 + Math.floor(Math.random() * 25)
+          shootTimer: 5 + Math.floor(Math.random() * 30)
         });
       }
     }
@@ -1025,12 +1033,16 @@
         tries++;
       }
       var roll = Math.random();
-      if (roll < 0.22) {
-        items.push({ x: x, y: y, born: Date.now(), type: "wheel" });   // yellow circle = prize wheel
-      } else if (roll < 0.42) {
-        items.push({ x: x, y: y, born: Date.now(), type: "chomper" }); // green ball = Chomper
+      if (roll < 0.20) {
+        items.push({ x: x, y: y, born: Date.now(), type: "wheel" });    // yellow circle = prize wheel
+      } else if (roll < 0.37) {
+        items.push({ x: x, y: y, born: Date.now(), type: "chomper" });  // green ball = Chomper
+      } else if (roll < 0.52) {
+        items.push({ x: x, y: y, born: Date.now(), type: "clone" });    // red ball = 5 clones
       } else if (roll < 0.60) {
-        items.push({ x: x, y: y, born: Date.now(), type: "clone" });   // red ball = 3 clones
+        items.push({ x: x, y: y, born: Date.now(), type: "clone50" });  // purple ball = 50 clones
+      } else if (roll < 0.66) {
+        items.push({ x: x, y: y, born: Date.now(), type: "clone100" }); // rainbow ball = 100 clones
       } else {
         var emojis = ["💣", "⚡", "⭐", "🎁"];
         items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
@@ -2036,11 +2048,25 @@
           ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.stroke();
         } else if (item.type === "clone") {
-          // a red ball — throw it to spawn 3 clone helpers!
+          // a red ball — throw it to spawn 5 clone helpers!
           ctx.fillStyle = "#ff2a2a";
           ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = "#7a0000"; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.stroke();
+        } else if (item.type === "clone50") {
+          // a purple ball — 50 clones!
+          ctx.fillStyle = "#9b30ff";
+          ctx.beginPath(); ctx.arc(item.x, item.y, 17, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 17, 0, Math.PI * 2); ctx.stroke();
+        } else if (item.type === "clone100") {
+          // a rainbow ball — 100 clones!
+          for (var rr = 5; rr >= 1; rr--) {
+            ctx.fillStyle = "hsl(" + ((tick * 6 + rr * 60) % 360) + ", 95%, 60%)";
+            ctx.beginPath(); ctx.arc(item.x, item.y, 18 * rr / 5, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 18, 0, Math.PI * 2); ctx.stroke();
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
@@ -2063,9 +2089,13 @@
         var tball = thrownBalls[tb];
         tball.vy += 0.25; // gravity
         tball.x += tball.vx; tball.y += tball.vy;
-        ctx.fillStyle = (tball.kind === "clone") ? "#ff2a2a" : "#3ddc4e";
+        var tcol = "#3ddc4e";
+        if (tball.kind === "clone") tcol = "#ff2a2a";
+        else if (tball.kind === "clone50") tcol = "#9b30ff";
+        else if (tball.kind === "clone100") tcol = "hsl(" + (tick * 6 % 360) + ", 95%, 60%)";
+        ctx.fillStyle = tcol;
         ctx.beginPath(); ctx.arc(tball.x, tball.y, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = (tball.kind === "clone") ? "#7a0000" : "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
         var landed = false;
         if (tball.y >= H - 12 || tball.x < 6 || tball.x > W - 6) landed = true;
         for (var lw = 0; lw < walls.length && !landed; lw++) {
@@ -2077,10 +2107,11 @@
           if (Math.sqrt(ldx * ldx + ldy * ldy) < lbal.r + 12) landed = true;
         }
         if (landed) {
-          if (tball.kind === "clone") {
-            spawnClones(tball.x, tball.y);
-            makeFloater(tball.x, tball.y, "CLONES! 👥", "#ff2a2a");
-            makeSparkles(tball.x, tball.y, "#ff2a2a", 20);
+          if (tball.kind === "clone" || tball.kind === "clone50" || tball.kind === "clone100") {
+            var num = tball.kind === "clone100" ? 100 : (tball.kind === "clone50" ? 50 : 5);
+            spawnClones(num);
+            makeFloater(tball.x, tball.y, num + " CLONES! 👥", "#ffd23f");
+            makeSparkles(tball.x, tball.y, "#ffd23f", 24);
           } else {
             spawnChomper(tball.x, tball.y);
           }
@@ -2253,9 +2284,13 @@
 
       // Holding a ball? Show it bobbing over the guy + a reminder
       if (heldType) {
-        ctx.fillStyle = (heldType === "clone") ? "#ff2a2a" : "#3ddc4e";
+        var hcol = "#3ddc4e";
+        if (heldType === "clone") hcol = "#ff2a2a";
+        else if (heldType === "clone50") hcol = "#9b30ff";
+        else if (heldType === "clone100") hcol = "hsl(" + (tick * 6 % 360) + ", 95%, 60%)";
+        ctx.fillStyle = hcol;
         ctx.beginPath(); ctx.arc(guy.x, guy.y - gh / 2 - 22, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = (heldType === "clone") ? "#7a0000" : "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
         ctx.fillStyle = "#fff";
         ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
         ctx.textAlign = "center";
