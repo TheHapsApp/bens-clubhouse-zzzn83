@@ -643,6 +643,7 @@
         var delta = Date.now() - pauseStart;
         fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta;
         dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
+        for (var hi = 0; hi < hearts.length; hi++) hearts[hi].born += delta; // hearts wait too
         if (pauseMusicWasOn) startMusic();
       }
     }
@@ -668,7 +669,7 @@
     var hearts = [];   // falling hearts that give an extra life
 
     function spawnHeart(x, y) {
-      hearts.push({ x: x, y: y, vy: 0.6 + Math.random() * 0.8, vx: (Math.random() * 2 - 1) });
+      hearts.push({ x: x, y: y, born: Date.now() }); // stays still, 30s to grab it
     }
     var score = 0;
     var lives = 12;
@@ -1588,14 +1589,18 @@
         if (fl.life <= 0) floaters.splice(f, 1);
       }
 
-      // Move, draw, and collect the falling hearts (each one = +1 life)
+      // Hearts stay still — 30s to grab one, flashing near the end (each = +1 life)
       ctx.font = "28px 'Comic Sans MS', sans-serif";
       ctx.textAlign = "center";
       for (var ht = hearts.length - 1; ht >= 0; ht--) {
         var hd = hearts[ht];
-        hd.y += hd.vy; hd.x += hd.vx;
-        ctx.fillText("❤️", hd.x, hd.y);
-        // collected by the guy?
+        var age = Date.now() - hd.born;
+        if (age >= 30000) { hearts.splice(ht, 1); continue; } // 30s up — it's gone!
+        var visible = true;
+        if (age >= 25000)      visible = (tick % 10 < 5);  // 25s+ : fast flash
+        else if (age >= 20000) visible = (tick % 24 < 12); // 20s+ : slow flash
+        if (visible) ctx.fillText("❤️", hd.x, hd.y);
+        // collected by the guy? (works even while flashing)
         if (guy.x > 0 && !dying && !gameOver) {
           var hdx = hd.x - guy.x, hdy = hd.y - guy.y;
           if (Math.sqrt(hdx * hdx + hdy * hdy) < 22 + gw / 2) {
@@ -1607,7 +1612,6 @@
             continue;
           }
         }
-        if (hd.y > H + 30) hearts.splice(ht, 1); // fell off the bottom
       }
 
       // Hide the guy entirely while he's a cloud of particles (dying)
