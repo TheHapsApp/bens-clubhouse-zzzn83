@@ -641,6 +641,11 @@
     var bullets = [];
     var sparkles = [];
     var floaters = []; // little "+3" / "+5" point popups
+    var hearts = [];   // falling hearts that give an extra life
+
+    function spawnHeart(x, y) {
+      hearts.push({ x: x, y: y, vy: 0.6 + Math.random() * 0.8, vx: (Math.random() * 2 - 1) });
+    }
     var score = 0;
     var lives = 12;
     var gameOver = false;
@@ -680,6 +685,7 @@
       ultimateActive = false;
       uHolding = false;
       dying = false;
+      hearts.length = 0;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -1498,6 +1504,10 @@
             balloons.splice(k, 1);
             score += bu.points;
             bumpScore();
+            // Sometimes a popped balloon drops a heart (or even two!)
+            var hr = Math.random();
+            if (hr < 0.04)      { spawnHeart(bal.drawX || bal.x, bal.y); spawnHeart((bal.drawX || bal.x) + 14, bal.y); }
+            else if (hr < 0.12) { spawnHeart(bal.drawX || bal.x, bal.y); }
             if (!bu.big) { // small bullets stop at the first balloon...
               bullets.splice(j, 1);
               bulletGone = true;
@@ -1547,6 +1557,28 @@
         ctx.fillText(fl.text, fl.x, fl.y);
         ctx.globalAlpha = 1;
         if (fl.life <= 0) floaters.splice(f, 1);
+      }
+
+      // Move, draw, and collect the falling hearts (each one = +1 life)
+      ctx.font = "28px 'Comic Sans MS', sans-serif";
+      ctx.textAlign = "center";
+      for (var ht = hearts.length - 1; ht >= 0; ht--) {
+        var hd = hearts[ht];
+        hd.y += hd.vy; hd.x += hd.vx;
+        ctx.fillText("❤️", hd.x, hd.y);
+        // collected by the guy?
+        if (guy.x > 0 && !dying && !gameOver) {
+          var hdx = hd.x - guy.x, hdy = hd.y - guy.y;
+          if (Math.sqrt(hdx * hdx + hdy * hdy) < 22 + gw / 2) {
+            lives += 1;
+            updateLives();
+            makeFloater(hd.x, hd.y, "+1 LIFE", "#ff5fa2");
+            playPowerup();
+            hearts.splice(ht, 1);
+            continue;
+          }
+        }
+        if (hd.y > H + 30) hearts.splice(ht, 1); // fell off the bottom
       }
 
       // Hide the guy entirely while he's a cloud of particles (dying)
