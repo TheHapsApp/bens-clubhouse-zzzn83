@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Keep this page off Google so it stays our secret -->
   <meta name="robots" content="noindex, nofollow">
-  <title>Balloon Popper!</title>
+  <title>Blastroid</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%A5%3C/text%3E%3C/svg%3E">
   <style>
     :root {
       --p1: #ff5fa2;
@@ -90,7 +91,9 @@
 
     h1 {
       font-size: clamp(2.2rem, 8vw, 4.5rem);
-      text-shadow: 4px 4px 0 rgba(0,0,0,0.18);
+      color: #ffd23f;
+      letter-spacing: 2px;
+      text-shadow: 0 0 12px #ff2a2a, 0 0 24px #ff2a2a, 3px 3px 0 #b00000, 5px 5px 0 rgba(0,0,0,0.25);
       animation: pop 2.5s ease-in-out infinite;
     }
     @keyframes pop {
@@ -148,7 +151,9 @@
     .screen.show { display: flex; }
     .screen-title {
       font-size: clamp(2.2rem, 9vw, 4.5rem);
-      text-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+      color: #ffd23f;
+      letter-spacing: 2px;
+      text-shadow: 0 0 12px #ff2a2a, 0 0 26px #ff2a2a, 3px 3px 0 #b00000, 5px 5px 0 rgba(0,0,0,0.25);
       animation: pop 2.2s ease-in-out infinite;
     }
     .bigbtn {
@@ -292,7 +297,7 @@
   <button id="pauseBtn" type="button">⏸ Pause</button>
 
   <div class="content">
-    <h1>🎈 Balloon Popper! 💥</h1>
+    <h1>💥🔴 BLASTROID 🔴💥</h1>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
@@ -307,7 +312,7 @@
 
   <!-- Title screen -->
   <div id="title" class="screen show">
-    <div class="screen-title">🎈 Balloon Popper! 💥</div>
+    <div class="screen-title">💥🔴 BLASTROID 🔴💥</div>
     <button id="playBtn" class="bigbtn">▶ PLAY</button>
     <button id="howBtn" class="smallbtn">❓ How to Play</button>
     <div class="lb">
