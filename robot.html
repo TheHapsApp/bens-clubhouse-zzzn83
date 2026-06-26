@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Robot Says Anything!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #3fd0ff, #8a5cff, #ff5fa2);
+      background-size: 300% 300%;
+      animation: flow 12s ease infinite;
+      padding: 24px 16px 50px;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 { font-size: clamp(1.8rem, 7vw, 3.2rem); text-shadow: 3px 3px 0 rgba(0,0,0,0.2); }
+    .sub { font-size: clamp(1rem, 3.5vw, 1.3rem); margin: 8px 0 16px; }
+
+    #robot {
+      font-size: clamp(4rem, 20vw, 7rem);
+      transition: transform 0.1s ease;
+      display: inline-block;
+    }
+    #robot.talking { animation: nod 0.25s ease-in-out infinite; }
+    @keyframes nod { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-8px) scale(1.05)} }
+
+    textarea {
+      width: 100%;
+      max-width: 560px;
+      height: 90px;
+      font-family: inherit;
+      font-size: 1.3rem;
+      text-align: center;
+      color: #4a2cff;
+      border: 4px solid #fff;
+      border-radius: 18px;
+      padding: 12px;
+      margin: 14px 0;
+      resize: none;
+    }
+    .btn {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: clamp(1.3rem, 5.5vw, 2rem);
+      color: #6a2cff;
+      background: #ffd23f;
+      border: 4px solid #fff;
+      border-radius: 24px;
+      padding: 16px 40px;
+      margin: 8px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+
+    .presets { margin: 14px 0; }
+    .chip {
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1rem;
+      color: #fff;
+      background: rgba(255,255,255,0.25);
+      border: 3px solid #fff;
+      border-radius: 18px;
+      padding: 8px 14px;
+      margin: 4px;
+      cursor: pointer;
+    }
+    .chip:active { transform: translateY(2px); }
+
+    .sliders { max-width: 440px; margin: 14px auto; text-align: left; }
+    .sliders label { display: block; font-size: 1.1rem; margin: 10px 0 2px; }
+    .sliders input { width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>🤖 Robot Says Anything! 🔊</h1>
+  <p class="sub">Type something silly, then tap SAY IT and the robot reads it out loud!</p>
+
+  <div id="robot">🤖</div>
+
+  <textarea id="text" placeholder="Type anything here...">Mr. Poo Poo Butt Dude</textarea>
+
+  <div class="presets" id="presets"></div>
+
+  <div>
+    <button class="btn" id="sayBtn">🔊 SAY IT!</button>
+    <button class="btn" id="stopBtn" style="background:#ff7a7a;">⏹ Stop</button>
+  </div>
+
+  <div class="sliders">
+    <label>🐢 Speed 🐇 <span id="rateVal">1.0</span></label>
+    <input type="range" id="rate" min="0.4" max="2" step="0.1" value="1">
+    <label>🔈 Low voice — High voice 🔊 <span id="pitchVal">1.0</span></label>
+    <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+  </div>
+
+  <script>
+    var robot = document.getElementById("robot");
+    var textEl = document.getElementById("text");
+    var rate = document.getElementById("rate");
+    var pitch = document.getElementById("pitch");
+    var rateVal = document.getElementById("rateVal");
+    var pitchVal = document.getElementById("pitchVal");
+
+    rate.addEventListener("input", function () { rateVal.textContent = (+rate.value).toFixed(1); });
+    pitch.addEventListener("input", function () { pitchVal.textContent = (+pitch.value).toFixed(1); });
+
+    function say() {
+      var words = textEl.value.trim();
+      if (!words) return;
+      if (!("speechSynthesis" in window)) {
+        alert("Sorry, your browser can't do the robot voice!");
+        return;
+      }
+      window.speechSynthesis.cancel(); // stop anything already talking
+      var u = new SpeechSynthesisUtterance(words);
+      u.rate = +rate.value;
+      u.pitch = +pitch.value;
+      u.onstart = function () { robot.classList.add("talking"); };
+      u.onend = function () { robot.classList.remove("talking"); };
+      u.onerror = function () { robot.classList.remove("talking"); };
+      window.speechSynthesis.speak(u);
+    }
+    function stop() {
+      window.speechSynthesis.cancel();
+      robot.classList.remove("talking");
+    }
+
+    document.getElementById("sayBtn").addEventListener("click", say);
+    document.getElementById("stopBtn").addEventListener("click", stop);
+
+    // silly preset buttons
+    var presets = ["Mr. Poo Poo Butt Dude", "Bum bum bum bum bum!", "Chocolate milk please!",
+                   "I love pizza and gas station water", "Beep boop I am a robot", "Boo boo boo butt cheeks"];
+    var pwrap = document.getElementById("presets");
+    presets.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = p;
+      b.addEventListener("click", function () { textEl.value = p; say(); });
+      pwrap.appendChild(b);
+    });
+  </script>
+</body>
+</html>
