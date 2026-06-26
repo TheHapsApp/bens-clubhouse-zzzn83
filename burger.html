@@ -82,13 +82,16 @@
   <h2>1. Pick your burger</h2>
   <div class="row" id="baseRow"></div>
 
-  <h2>2. Add toppings 🥬</h2>
+  <h2>2. Pick your patty 🍖🍗</h2>
+  <div class="row" id="pattyRow"></div>
+
+  <h2>3. Add toppings 🥬</h2>
   <div class="row" id="topRow"></div>
 
-  <h2>3. Pick a side 🍟</h2>
+  <h2>4. Pick a side 🍟</h2>
   <div class="row" id="sideRow"></div>
 
-  <h2>4. Pick a drink 🥤</h2>
+  <h2>5. Pick a drink 🥤</h2>
   <div class="row" id="drinkRow"></div>
 
   <div id="preview">
@@ -106,15 +109,18 @@
       { id: "ham", label: "Hamburger 🍔", cheese: false },
       { id: "cheese", label: "Cheeseburger 🧀", cheese: true }
     ];
+    var PATTIES = [
+      { e: "🍖", n: "Beef Patty" }, { e: "🍗", n: "Chicken Patty" }
+    ];
     var TOPPINGS = [
       { e: "🥬", n: "Lettuce" }, { e: "🍅", n: "Tomato" }, { e: "🧅", n: "Onion" },
       { e: "🥒", n: "Pickle" }, { e: "🥓", n: "Bacon" }, { e: "🍄", n: "Mushroom" },
-      { e: "🥚", n: "Egg" }, { e: "🌶️", n: "Hot Sauce" }
+      { e: "🥚", n: "Egg" }, { e: "🌶️", n: "Hot Sauce" }, { e: "🥫", n: "Fry Sauce" }
     ];
     var SIDES = [ { e: "🍟", n: "Fries" }, { e: "🧅", n: "Onion Rings" } ];
     var DRINKS = [ { e: "🥤", n: "Soda" }, { e: "🧃", n: "Juice" }, { e: "🥛", n: "Milk" }, { e: "💧", n: "Water" } ];
 
-    var state = { base: "cheese", toppings: [], side: "🍟", drink: "🥤" };
+    var state = { base: "cheese", patty: "🍖", toppings: [], side: "🍟", drink: "🥤" };
 
     function makeChips(rowId, list, isSelected, onClick) {
       var row = document.getElementById(rowId);
@@ -131,6 +137,8 @@
     function rebuild() {
       makeChips("baseRow", BASES, function (b) { return state.base === b.id; },
         function (b) { state.base = b.id; });
+      makeChips("pattyRow", PATTIES, function (p) { return state.patty === p.e; },
+        function (p) { state.patty = p.e; });
       makeChips("topRow", TOPPINGS, function (t) { return state.toppings.indexOf(t.e) > -1; },
         function (t) {
           var i = state.toppings.indexOf(t.e);
@@ -149,7 +157,7 @@
       var lines = ["🍞"]; // top bun
       state.toppings.forEach(function (e) { lines.push(e); });
       if (cheese) lines.push("🧀");
-      lines.push("🍖"); // the patty
+      lines.push(state.patty); // beef or chicken patty
       lines.push("🍞"); // bottom bun
       document.getElementById("stack").innerHTML = lines.join("<br>");
       document.getElementById("sides").textContent = state.side + " " + state.drink;
@@ -182,7 +190,7 @@
 
     document.getElementById("serveBtn").addEventListener("click", serve);
     document.getElementById("resetBtn").addEventListener("click", function () {
-      state = { base: "cheese", toppings: [], side: "🍟", drink: "🥤" };
+      state = { base: "cheese", patty: "🍖", toppings: [], side: "🍟", drink: "🥤" };
       document.getElementById("message").textContent = "";
       rebuild();
     });
