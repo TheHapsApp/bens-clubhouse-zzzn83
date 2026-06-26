@@ -304,7 +304,7 @@
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
-    <p class="gamehint">🎁 Fly to a pickup item and press A to grab it! 🟡 yellow = prize wheel • 🟢 green = Chomper ball (press T to throw!)</p>
+    <p class="gamehint">🎁 Fly to a pickup item and press A to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴 clone ball (press T to throw!)</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
@@ -637,9 +637,9 @@
     // Press T to throw the Chomper ball
     window.addEventListener("keydown", function (e) {
       if (e.key !== "t" && e.key !== "T") return;
-      if (!holdingBall || gameOver || paused || dying || wheelActive || !started) return;
-      holdingBall = false;
-      thrownBalls.push({ x: guy.x, y: guy.y, vx: 0, vy: 5 });
+      if (!heldType || gameOver || paused || dying || wheelActive || !started) return;
+      thrownBalls.push({ x: guy.x, y: guy.y, vx: 0, vy: 5, kind: heldType });
+      heldType = null;
       playShoot();
     });
 
@@ -654,8 +654,12 @@
           if (item.type === "wheel") {
             startWheel(); // spin for a random prize!
           } else if (item.type === "chomper") {
-            holdingBall = true; // now you're holding the Chomper ball
+            heldType = "chomp"; // holding the green Chomper ball
             makeFloater(item.x, item.y, "GOT CHOMP BALL! Press T", "#3ddc4e");
+            playPowerup();
+          } else if (item.type === "clone") {
+            heldType = "clone"; // holding the red clone ball
+            makeFloater(item.x, item.y, "GOT CLONE BALL! Press T", "#ff2a2a");
             playPowerup();
           } else {
             usePickup();
@@ -718,9 +722,22 @@
     var bossActive = false;
     var items = [];          // pickups — fly near one and press A to use it
     var itemCooldown = 350;  // frames until the next item appears
-    var holdingBall = false; // holding the Chomper ball (press T to throw)
-    var thrownBalls = [];    // Chomper balls flying through the air
+    var heldType = null;     // null, "chomp" (green ball) or "clone" (red ball); press T to throw
+    var thrownBalls = [];    // balls flying through the air
     var chompers = [];       // big Chompers eating balloons where a ball landed
+    var clones = [];         // helper clones of you that auto-pop balloons
+
+    function spawnClones(x, y) {
+      for (var i = 0; i < 3; i++) {
+        clones.push({
+          x: x + (Math.random() * 80 - 40),
+          y: y + (Math.random() * 80 - 40),
+          vx: 0, vy: 0,
+          born: Date.now(),
+          shootTimer: 10 + Math.floor(Math.random() * 25)
+        });
+      }
+    }
 
     function spawnChomper(x, y) {
       chompers.push({
@@ -779,9 +796,10 @@
       items.length = 0;
       itemCooldown = 350;
       wheelActive = false;
-      holdingBall = false;
+      heldType = null;
       thrownBalls.length = 0;
       chompers.length = 0;
+      clones.length = 0;
       wallHoles = {};
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
@@ -993,10 +1011,12 @@
       var x = 60 + Math.random() * (W - 120);
       var y = 90 + Math.random() * (H - 240);
       var roll = Math.random();
-      if (roll < 0.25) {
+      if (roll < 0.22) {
         items.push({ x: x, y: y, born: Date.now(), type: "wheel" });   // yellow circle = prize wheel
-      } else if (roll < 0.45) {
+      } else if (roll < 0.42) {
         items.push({ x: x, y: y, born: Date.now(), type: "chomper" }); // green ball = Chomper
+      } else if (roll < 0.60) {
+        items.push({ x: x, y: y, born: Date.now(), type: "clone" });   // red ball = 3 clones
       } else {
         var emojis = ["💣", "⚡", "⭐", "🎁"];
         items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
@@ -1714,23 +1734,26 @@
       // Draw + move bullets, check for pops
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
-        bu.y += bu.speed * (bu.dir || -1); // dir -1 = up, +1 = down
-        // Small bullets bounce off brown walls; SUPER shots punch through (making a hole)
-        for (var bw = 0; bw < walls.length; bw++) {
-          var wbl = walls[bw];
-          if (wbl.red) continue; // straight through red walls
-          if (!circleRectOverlap(bu.x, bu.y, bu.r, wbl)) continue;
-          if (bu.big) {
-            wallHoles[bw] = { x: bu.x, until: Date.now() + 2500 }; // punch a hole that heals
-            // pass straight through — no bounce
-          } else {
-            bu.dir = (bu.dir || -1) * -1; // flip up/down
-            bu.y = (bu.dir < 0) ? (wbl.y - bu.r - 1) : (wbl.y + wbl.h + bu.r + 1);
-            bu.bounces = (bu.bounces || 0) + 1;
-            break;
+        if (bu.vx !== undefined) {            // clone bullets fly in an aimed direction
+          bu.x += bu.vx; bu.y += bu.vy;
+        } else {
+          bu.y += bu.speed * (bu.dir || -1);  // your bullets go straight up/down
+          // Small bullets bounce off brown walls; SUPER shots punch through (making a hole)
+          for (var bw = 0; bw < walls.length; bw++) {
+            var wbl = walls[bw];
+            if (wbl.red) continue; // straight through red walls
+            if (!circleRectOverlap(bu.x, bu.y, bu.r, wbl)) continue;
+            if (bu.big) {
+              wallHoles[bw] = { x: bu.x, until: Date.now() + 2500 }; // punch a hole that heals
+            } else {
+              bu.dir = (bu.dir || -1) * -1; // flip up/down
+              bu.y = (bu.dir < 0) ? (wbl.y - bu.r - 1) : (wbl.y + wbl.h + bu.r + 1);
+              bu.bounces = (bu.bounces || 0) + 1;
+              break;
+            }
           }
+          if (bu.bounces > 6) { bullets.splice(j, 1); continue; } // stop after lots of bounces
         }
-        if (bu.bounces > 6) { bullets.splice(j, 1); continue; } // stop after lots of bounces
         ctx.fillStyle = bu.color || "#fff";
         ctx.beginPath();
         ctx.arc(bu.x, bu.y, bu.r, 0, Math.PI * 2);
@@ -1743,7 +1766,8 @@
           ctx.stroke();
         }
 
-        if (bu.y + bu.r < -10 || bu.y - bu.r > H + 10) { bullets.splice(j, 1); continue; }
+        if (bu.y + bu.r < -10 || bu.y - bu.r > H + 10 ||
+            bu.x + bu.r < -10 || bu.x - bu.r > W + 10) { bullets.splice(j, 1); continue; }
 
         // A SUPER shot hitting the rainbow ball powers up the guy!
         if (rainbowBall && bu.big) {
@@ -1908,6 +1932,12 @@
           ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.stroke();
+        } else if (item.type === "clone") {
+          // a red ball — throw it to spawn 3 clone helpers!
+          ctx.fillStyle = "#ff2a2a";
+          ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#7a0000"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 16, 0, Math.PI * 2); ctx.stroke();
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
@@ -1930,9 +1960,9 @@
         var tball = thrownBalls[tb];
         tball.vy += 0.25; // gravity
         tball.x += tball.vx; tball.y += tball.vy;
-        ctx.fillStyle = "#3ddc4e";
+        ctx.fillStyle = (tball.kind === "clone") ? "#ff2a2a" : "#3ddc4e";
         ctx.beginPath(); ctx.arc(tball.x, tball.y, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = (tball.kind === "clone") ? "#7a0000" : "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
         var landed = false;
         if (tball.y >= H - 12 || tball.x < 6 || tball.x > W - 6) landed = true;
         for (var lw = 0; lw < walls.length && !landed; lw++) {
@@ -1943,7 +1973,17 @@
           var ldx = (lbal.drawX || lbal.x) - tball.x, ldy = lbal.y - tball.y;
           if (Math.sqrt(ldx * ldx + ldy * ldy) < lbal.r + 12) landed = true;
         }
-        if (landed) { spawnChomper(tball.x, tball.y); playBoom(); thrownBalls.splice(tb, 1); }
+        if (landed) {
+          if (tball.kind === "clone") {
+            spawnClones(tball.x, tball.y);
+            makeFloater(tball.x, tball.y, "CLONES! 👥", "#ff2a2a");
+            makeSparkles(tball.x, tball.y, "#ff2a2a", 20);
+          } else {
+            spawnChomper(tball.x, tball.y);
+          }
+          playBoom();
+          thrownBalls.splice(tb, 1);
+        }
       }
 
       // Chompers — a big green monster that chomps balloons nearby for a few seconds
@@ -1997,13 +2037,51 @@
           var ebal = balloons[eb];
           if (ebal.boss) continue;
           var edx = (ebal.drawX || ebal.x) - cmp.x, edy = ebal.y - cmp.y;
-          if (Math.sqrt(edx * edx + edy * edy) < 120) {
+          if (Math.sqrt(edx * edx + edy * edy) < 50 + ebal.r) { // only when it TOUCHES
             makeSparkles(ebal.drawX || ebal.x, ebal.y, ebal.color);
             makeFloater(ebal.drawX || ebal.x, ebal.y, "+2", "#3ddc4e");
             balloons.splice(eb, 1); score += 2; popCount++;
             bumpScore(); playPop();
           }
         }
+      }
+
+      // Clone helpers — little copies of you that chase + shoot balloons
+      for (var cl = clones.length - 1; cl >= 0; cl--) {
+        var cln = clones[cl];
+        if (Date.now() - cln.born > 12000) { clones.splice(cl, 1); continue; } // last ~12s
+        // find nearest balloon to chase + shoot
+        var cltarget = null, clbest = Infinity;
+        for (var li = 0; li < balloons.length; li++) {
+          if (balloons[li].boss) continue;
+          var ltx = (balloons[li].drawX || balloons[li].x) - cln.x;
+          var lty = balloons[li].y - cln.y;
+          var ldd = ltx * ltx + lty * lty;
+          if (ldd < clbest) { clbest = ldd; cltarget = balloons[li]; }
+        }
+        if (cltarget) {
+          var lang = Math.atan2(cltarget.y - cln.y, (cltarget.drawX || cltarget.x) - cln.x);
+          cln.vx = Math.cos(lang) * 2.2; cln.vy = Math.sin(lang) * 2.2;
+        } else { cln.vx *= 0.9; cln.vy *= 0.9; }
+        cln.x += cln.vx; cln.y += cln.vy;
+        cln.x = Math.max(20, Math.min(W - 20, cln.x));
+        cln.y = Math.max(20, Math.min(H - 20, cln.y));
+        // auto-shoot at the target
+        cln.shootTimer--;
+        if (cln.shootTimer <= 0 && cltarget) {
+          var sang = Math.atan2(cltarget.y - cln.y, (cltarget.drawX || cltarget.x) - cln.x);
+          bullets.push({ x: cln.x, y: cln.y, r: 5, big: false, color: "#3fd0ff", points: 1,
+                         vx: Math.cos(sang) * 9, vy: Math.sin(sang) * 9 });
+          cln.shootTimer = 22;
+        }
+        // draw the clone (a small cyan triangle copy of you)
+        ctx.fillStyle = "#3fd0ff";
+        ctx.beginPath();
+        ctx.moveTo(cln.x, cln.y + 16);
+        ctx.lineTo(cln.x - 11, cln.y - 10);
+        ctx.lineTo(cln.x + 11, cln.y - 10);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
       }
 
       // Hide the guy entirely while he's a cloud of particles (dying)
@@ -2069,11 +2147,11 @@
       ctx.beginPath(); ctx.arc(cx - gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(cx + gw * 0.13, eyeY, 3, 0, Math.PI * 2); ctx.fill();
 
-      // Holding the Chomper ball? Show it bobbing over the guy + a reminder
-      if (holdingBall) {
-        ctx.fillStyle = "#3ddc4e";
+      // Holding a ball? Show it bobbing over the guy + a reminder
+      if (heldType) {
+        ctx.fillStyle = (heldType === "clone") ? "#ff2a2a" : "#3ddc4e";
         ctx.beginPath(); ctx.arc(guy.x, guy.y - gh / 2 - 22, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = (heldType === "clone") ? "#7a0000" : "#0a7a1c"; ctx.lineWidth = 3; ctx.stroke();
         ctx.fillStyle = "#fff";
         ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
         ctx.textAlign = "center";
