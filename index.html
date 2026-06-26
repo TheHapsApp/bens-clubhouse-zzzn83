@@ -1592,6 +1592,17 @@
       for (var j = bullets.length - 1; j >= 0; j--) {
         var bu = bullets[j];
         bu.y += bu.speed * (bu.dir || -1); // dir -1 = up, +1 = down
+        // Bounce off the walls!
+        for (var bw = 0; bw < walls.length; bw++) {
+          var wbl = walls[bw];
+          if (circleRectOverlap(bu.x, bu.y, bu.r, wbl)) {
+            bu.dir = (bu.dir || -1) * -1; // flip up/down
+            bu.y = (bu.dir < 0) ? (wbl.y - bu.r - 1) : (wbl.y + wbl.h + bu.r + 1);
+            bu.bounces = (bu.bounces || 0) + 1;
+            break;
+          }
+        }
+        if (bu.bounces > 6) { bullets.splice(j, 1); continue; } // stop after lots of bounces
         ctx.fillStyle = bu.color || "#fff";
         ctx.beginPath();
         ctx.arc(bu.x, bu.y, bu.r, 0, Math.PI * 2);
