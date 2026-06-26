@@ -793,19 +793,19 @@
     // Walls + squares. Brown = safe (hide here). Red = DON'T TOUCH (kaboom!)
     function getWalls() {
       return [
-        // brown walls (safe — block the spikes)
-        { x: W * 0.06, y: H * 0.55, w: W * 0.22, h: 20, red: false },
-        { x: W * 0.72, y: H * 0.44, w: W * 0.22, h: 20, red: false },
-        { x: W * 0.40, y: H * 0.72, w: W * 0.20, h: 20, red: false },
+        // brown walls (safe — block the spikes) — spread out more
+        { x: W * 0.03, y: H * 0.28, w: W * 0.20, h: 20, red: false },
+        { x: W * 0.77, y: H * 0.40, w: W * 0.20, h: 20, red: false },
+        { x: W * 0.40, y: H * 0.78, w: W * 0.20, h: 20, red: false },
         // brown squares (safe)
-        { x: W * 0.30, y: H * 0.34, w: 60, h: 60, red: false },
-        { x: W * 0.60, y: H * 0.60, w: 60, h: 60, red: false },
-        // red walls (deadly — can't touch!)
-        { x: W * 0.62, y: H * 0.52, w: W * 0.16, h: 18, red: true },
-        { x: W * 0.10, y: H * 0.30, w: W * 0.15, h: 18, red: true },
-        // red squares (deadly)
-        { x: W * 0.80, y: H * 0.66, w: 55, h: 55, red: true },
-        { x: W * 0.20, y: H * 0.68, w: 55, h: 55, red: true }
+        { x: W * 0.26, y: H * 0.52, w: 60, h: 60, red: false },
+        { x: W * 0.66, y: H * 0.64, w: 60, h: 60, red: false },
+        // red walls (touching = lose 3 lives!)
+        { x: W * 0.56, y: H * 0.28, w: W * 0.16, h: 18, red: true },
+        { x: W * 0.04, y: H * 0.62, w: W * 0.15, h: 18, red: true },
+        // red squares
+        { x: W * 0.86, y: H * 0.72, w: 55, h: 55, red: true },
+        { x: W * 0.14, y: H * 0.80, w: 55, h: 55, red: true }
       ];
     }
     // Does a circle (cx,cy,r) overlap a rectangle?
@@ -1185,16 +1185,19 @@
       var gw = guy.w * sizeMul;
       var gh = guy.h * sizeMul;
 
-      // Touching a RED block = KABOOM and start over!
-      if (guy.x > 0 && !gameOver && !ultimateActive && !dying) {
+      // Touching a RED block = lose 3 lives (then bounce back to home base)
+      if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying) {
         var redBlocks = getWalls();
         for (var rbk = 0; rbk < redBlocks.length; rbk++) {
           if (redBlocks[rbk].red && circleRectOverlap(guy.x, guy.y, gw / 2, redBlocks[rbk])) {
             explode(guy.x, guy.y);
-            screenExplode();
-            score = 0;
-            scoreNum.textContent = "0";
-            triggerGameOver();
+            playBonk();
+            lives -= 3;
+            if (lives < 0) lives = 0;
+            updateLives();
+            var rpt = respawnPoint();
+            guy.x = rpt.x; guy.y = rpt.y; mouse.x = rpt.x; mouse.y = rpt.y;
+            if (lives <= 0) triggerGameOver();
             break;
           }
         }
