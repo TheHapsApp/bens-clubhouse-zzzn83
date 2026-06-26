@@ -430,6 +430,30 @@
       o.connect(g); g.connect(ac.destination);
       o.start(); o.stop(ac.currentTime + 0.13);
     }
+    // Rising "powering up" sound while you hold S to charge the super shot
+    var chargeOsc = null, chargeGain = null;
+    function startChargeSound() {
+      var ac = ensureAudio(); if (!ac) return;
+      stopChargeSound();
+      chargeOsc = ac.createOscillator();
+      chargeGain = ac.createGain();
+      chargeOsc.type = "sawtooth";
+      chargeOsc.frequency.setValueAtTime(160, ac.currentTime);
+      chargeOsc.frequency.linearRampToValueAtTime(950, ac.currentTime + CHARGE_MS / 1000);
+      chargeGain.gain.setValueAtTime(0.0001, ac.currentTime);
+      chargeGain.gain.linearRampToValueAtTime(0.12, ac.currentTime + 0.05);
+      chargeOsc.connect(chargeGain); chargeGain.connect(ac.destination);
+      chargeOsc.start();
+    }
+    function stopChargeSound() {
+      if (chargeOsc && audioCtx) {
+        try {
+          chargeGain.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.02);
+          chargeOsc.stop(audioCtx.currentTime + 0.06);
+        } catch (e) {}
+      }
+      chargeOsc = null; chargeGain = null;
+    }
     // "POP!" when a balloon bursts (a quick noise burst)
     function playPop() {
       var ac = ensureAudio(); if (!ac) return;
@@ -973,6 +997,7 @@
         if (e.repeat || paused) return; // ignore auto-repeats and paused
         isCharging = true;
         chargeStart = performance.now();
+        startChargeSound(); // powering up noise!
       }
     });
     window.addEventListener("keyup", function (e) {
@@ -980,6 +1005,7 @@
         if (!isCharging) return;
         var held = performance.now() - chargeStart;
         isCharging = false;
+        stopChargeSound();
         shoot(held >= CHARGE_MS); // held long enough = big bullet
       }
     });
