@@ -441,7 +441,7 @@
       chargeOsc.frequency.setValueAtTime(160, ac.currentTime);
       chargeOsc.frequency.linearRampToValueAtTime(950, ac.currentTime + CHARGE_MS / 1000);
       chargeGain.gain.setValueAtTime(0.0001, ac.currentTime);
-      chargeGain.gain.linearRampToValueAtTime(0.12, ac.currentTime + 0.05);
+      chargeGain.gain.linearRampToValueAtTime(0.05, ac.currentTime + 0.05);
       chargeOsc.connect(chargeGain); chargeGain.connect(ac.destination);
       chargeOsc.start();
     }
