@@ -671,6 +671,9 @@
     var sparkles = [];
     var floaters = []; // little "+3" / "+5" point popups
     var hearts = [];   // falling hearts that give an extra life
+    var popCount = 0;     // how many balloons you've popped
+    var nextBossAt = 100; // a boss appears every 100 pops
+    var bossActive = false;
 
     function spawnHeart(x, y) {
       hearts.push({ x: x, y: y, born: Date.now() }); // stays still, 30s to grab it
@@ -715,6 +718,9 @@
       uHolding = false;
       dying = false;
       hearts.length = 0;
+      popCount = 0;
+      nextBossAt = 100;
+      bossActive = false;
       for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
@@ -744,6 +750,7 @@
         var popped = 0;
         for (var k = balloons.length - 1; k >= 0; k--) {
           var bal = balloons[k];
+          if (bal.boss) continue; // the bomb can't pop the boss
           var dx = (bal.drawX || bal.x) - guy.x;
           var dy = bal.y - guy.y;
           if (Math.sqrt(dx * dx + dy * dy) < radius) {
@@ -903,6 +910,25 @@
     for (var i = 0; i < 8; i++) {
       spawnBalloon();
       balloons[i].y = Math.random() * H; // start scattered
+    }
+
+    // The BOSS balloon — giant, takes 5 shots, comes with a swarm of tiny ones
+    function spawnBoss() {
+      bossActive = true;
+      balloons.push({
+        x: W / 2, y: H + 90, r: 80, speed: 0.6, sway: 0,
+        color: "#cc1111", boss: true, hp: 5
+      });
+      for (var i = 0; i < 10; i++) {
+        balloons.push({
+          x: 30 + Math.random() * (W - 60),
+          y: H + 40 + Math.random() * 220,
+          r: 12 + Math.random() * 6,
+          speed: 0.9 + Math.random() * 1.3,
+          sway: Math.random() * Math.PI * 2,
+          color: balloonColors[Math.floor(Math.random() * balloonColors.length)]
+        });
+      }
     }
 
     // ---- The rainbow power-up ball ----
@@ -1173,6 +1199,7 @@
           gained++;
         }
         balloons.length = 0;
+        bossActive = false; // boss gets cleared too
         if (gained > 0) bumpScore();
         playBoom();
         explode(guy.x, guy.y);
@@ -1221,12 +1248,18 @@
       if (!gameOver) {
         spawnTimer++;
         if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
+        // Every 100 balloons, a BOSS shows up!
+        if (!bossActive && popCount >= nextBossAt) {
+          spawnBoss();
+          nextBossAt += 100;
+        }
       }
 
       // Draw + move balloons
       for (var i = balloons.length - 1; i >= 0; i--) {
         var b = balloons[i];
         b.y -= b.speed;
+        if (b.boss && b.y <= H * 0.32) b.speed = 0; // boss hovers near the top
         b.sway += 0.03;
         var bx = b.x + Math.sin(b.sway) * 12;
 
@@ -1248,6 +1281,13 @@
         ctx.beginPath();
         ctx.ellipse(bx - b.r * 0.25, b.y - b.r * 0.3, b.r * 0.18, b.r * 0.28, 0, 0, Math.PI * 2);
         ctx.fill();
+        // boss shows how many hits are left
+        if (b.boss) {
+          ctx.fillStyle = "#fff";
+          ctx.textAlign = "center";
+          ctx.font = "bold 40px 'Comic Sans MS', sans-serif";
+          ctx.fillText(b.hp, bx, b.y + 14);
+        }
 
         b.drawX = bx; // remember where we drew it for collisions
 
@@ -1266,12 +1306,13 @@
           var pt = respawnPoint();         // start over at the WHEN box
           guy.x = pt.x; guy.y = pt.y;
           mouse.x = pt.x; mouse.y = pt.y;
+          if (b.boss) bossActive = false;
           balloons.splice(i, 1);
           if (lives <= 0) triggerGameOver();
           continue;
         }
 
-        if (b.y + b.r < -30) balloons.splice(i, 1); // floated off the top
+        if (b.y + b.r < -30) { if (b.boss) bossActive = false; balloons.splice(i, 1); } // off top
       }
 
       // ---- Walls + the danger wave ----
@@ -1357,6 +1398,7 @@
         // A spike touching a normal balloon pops it — but NO points (you didn't do it)
         for (var pb = balloons.length - 1; pb >= 0; pb--) {
           var nb = balloons[pb];
+          if (nb.boss) continue; // spikes can't pop the boss
           var pdx = (nb.drawX || nb.x) - d.x;
           var pdy = nb.y - d.y;
           if (Math.sqrt(pdx * pdx + pdy * pdy) < nb.r + d.r) {
@@ -1539,14 +1581,34 @@
           var dx = bu.x - (bal.drawX || bal.x);
           var dy = bu.y - bal.y;
           if (Math.sqrt(dx * dx + dy * dy) < bal.r + bu.r) {
-            makeSparkles(bal.drawX || bal.x, bal.y, bal.color);
+            var bcx = bal.drawX || bal.x;
+            // The BOSS takes several shots before it pops!
+            if (bal.boss) {
+              bal.hp -= 1;
+              makeSparkles(bcx, bal.y, "#fff", 10);
+              playPop();
+              if (bal.hp > 0) {
+                makeFloater(bcx, bal.y, bal.hp + " hits left!", "#fff");
+              } else {
+                makeSparkles(bcx, bal.y, "#ffd23f", 30);
+                makeFloater(bcx, bal.y, "BOSS! +25", "#ffd23f");
+                balloons.splice(k, 1);
+                score += 25; bumpScore(); popCount++;
+                bossActive = false;
+                spawnHeart(bcx, bal.y); spawnHeart(bcx + 16, bal.y);
+              }
+              if (!bu.big) { bullets.splice(j, 1); bulletGone = true; break; }
+              continue; // big bullet keeps going
+            }
+            makeSparkles(bcx, bal.y, bal.color);
             playPop();
             // Always show how many points this pop was worth
             var fColor = bu.points === 1 ? "#6a2cff" : bu.color;
-            makeFloater(bal.drawX || bal.x, bal.y, "+" + bu.points, fColor);
+            makeFloater(bcx, bal.y, "+" + bu.points, fColor);
             balloons.splice(k, 1);
             score += bu.points;
             bumpScore();
+            popCount++;
             // Sometimes a popped balloon drops a heart (or even two!)
             var hr = Math.random();
             if (hr < 0.04)      { spawnHeart(bal.drawX || bal.x, bal.y); spawnHeart((bal.drawX || bal.x) + 14, bal.y); }
