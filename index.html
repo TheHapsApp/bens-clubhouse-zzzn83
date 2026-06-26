@@ -989,6 +989,7 @@
     // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
     var isCharging = false;
     var chargeStart = 0;
+    var chargeSoundTimer = null; // delays the powering-up sound so taps are silent
     var CHARGE_MS = 350; // hold this long to make it a big bullet
     var flipped = true; // the guy is ALWAYS upside down now (it plays easier!)
 
@@ -998,7 +999,10 @@
         if (e.repeat || paused) return; // ignore auto-repeats and paused
         isCharging = true;
         chargeStart = performance.now();
-        startChargeSound(); // powering up noise!
+        // only start the powering-up sound if you HOLD (not a quick tap)
+        chargeSoundTimer = setTimeout(function () {
+          if (isCharging) startChargeSound();
+        }, 140);
       }
     });
     window.addEventListener("keyup", function (e) {
@@ -1006,6 +1010,7 @@
         if (!isCharging) return;
         var held = performance.now() - chargeStart;
         isCharging = false;
+        clearTimeout(chargeSoundTimer); // cancel a quick-tap's pending sound
         stopChargeSound();
         shoot(held >= CHARGE_MS); // held long enough = big bullet
       }
