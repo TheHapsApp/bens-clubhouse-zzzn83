@@ -202,14 +202,34 @@
     .howlist li { margin: 6px 0; }
 
     /* Cool Moves video replay */
-    #replayVideo {
+    #replayVideo, #faveVideo {
       width: min(90vw, 820px);
-      max-height: 62vh;
+      max-height: 52vh;
       background: #000;
       border: 5px solid #fff;
       border-radius: 20px;
       box-shadow: 0 6px 0 rgba(0,0,0,0.3);
     }
+    /* Favorite Videos gallery */
+    .faves-list {
+      width: min(92vw, 560px);
+      max-height: 46vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .fave-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.16);
+      border: 3px solid #fff;
+      border-radius: 16px;
+      padding: 8px 10px;
+    }
+    .fave-label { flex: 1; text-align: left; font-size: 1rem; }
+    .fave-row .smallbtn { padding: 8px 12px; font-size: 0.95rem; }
 
     /* Game Over screen */
     #gameover {
@@ -329,6 +349,7 @@
     <div class="screen-title">💥🔴 BLASTROID 🔴💥</div>
     <button id="playBtn" class="bigbtn">▶ PLAY</button>
     <button id="howBtn" class="smallbtn">❓ How to Play</button>
+    <button id="favesBtn" class="smallbtn">⭐ Favorite Videos</button>
     <div class="lb">
       <div class="lb-title">🏆 High Scores</div>
       <ol id="lbList"><li>No scores yet — be the first!</li></ol>
@@ -361,6 +382,7 @@
     </div>
     <div class="go-again">Press R to play again! 🔁</div>
     <button id="coolBtn" class="bigbtn">🎬 See your COOL MOVES!</button>
+    <button id="favesBtnOver" class="smallbtn">⭐ Favorite Videos</button>
     <button id="overTitleBtn" class="smallbtn">🏠 Title Screen</button>
   </div>
 
@@ -369,7 +391,18 @@
     <div class="screen-title">🎬 Your Game Replay!</div>
     <video id="replayVideo" playsinline muted loop controls></video>
     <div id="replayProgress" class="hint">Here's the real video of everything you did! ▶</div>
-    <button id="replayClose" class="smallbtn">⬅ Back</button>
+    <div>
+      <button id="saveFaveBtn" class="smallbtn">💾 Save to Favorites</button>
+      <button id="replayClose" class="smallbtn">⬅ Back</button>
+    </div>
+  </div>
+
+  <!-- Your Favorite Videos gallery -->
+  <div id="faves" class="screen">
+    <div class="screen-title">⭐ Your Favorite Videos</div>
+    <video id="faveVideo" playsinline muted loop controls style="display:none"></video>
+    <div id="favesList" class="faves-list"></div>
+    <button id="favesBack" class="smallbtn">⬅ Back</button>
   </div>
 
   <script>
@@ -430,8 +463,10 @@
     // We RECORD the real game canvas while you play, then play it back as a video!
     var mediaRecorder = null;   // the thing recording the screen
     var recURL = null;          // the finished video's web address
+    var recBlob = null;         // the finished video itself (so we can save it)
     var recSupported = true;    // false if this browser can't record
     var recReady = false;       // true once a finished video is ready to watch
+    var lastGameScore = 0;      // the score of the game we just recorded
 
     // Find a video format this browser can record
     function pickRecMime() {
@@ -456,7 +491,8 @@
         mr.onstop = function () {
           if (!chunks.length) return;
           if (recURL) URL.revokeObjectURL(recURL);
-          recURL = URL.createObjectURL(new Blob(chunks, { type: mr.mimeType || "video/webm" }));
+          recBlob = new Blob(chunks, { type: mr.mimeType || "video/webm" });
+          recURL = URL.createObjectURL(recBlob);
           recReady = true;
           var vid = document.getElementById("replayVideo");
           vid.src = recURL;
@@ -481,6 +517,10 @@
       var vid = document.getElementById("replayVideo");
       var msg = document.getElementById("replayProgress");
       document.getElementById("replay").classList.add("show");
+      // fresh Save button each time you open a new game's replay
+      var sBtn = document.getElementById("saveFaveBtn");
+      sBtn.textContent = "💾 Save to Favorites";
+      sBtn.disabled = false;
       if (!recSupported) {
         vid.style.display = "none";
         msg.textContent = "This browser can't record a video — but you did awesome! 🎉";
@@ -502,6 +542,112 @@
       var vid = document.getElementById("replayVideo");
       try { vid.pause(); } catch (e) {}
       document.getElementById("replay").classList.remove("show");
+    });
+
+    /* ===================== YOUR FAVORITE VIDEOS (saved forever) ===================== */
+    // We keep saved videos in the browser's big storage box (IndexedDB) so they
+    // stay even after you close the page.
+    var DB_NAME = "blastroidFaves", DB_STORE = "videos", _db = null;
+    function openDB() {
+      return new Promise(function (resolve, reject) {
+        if (_db) return resolve(_db);
+        if (!window.indexedDB) return reject("no indexeddb");
+        var req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = function () {
+          var db = req.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE, { keyPath: "id", autoIncrement: true });
+          }
+        };
+        req.onsuccess = function () { _db = req.result; resolve(_db); };
+        req.onerror = function () { reject(req.error); };
+      });
+    }
+    function saveFavorite(blob, score) {
+      return openDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+          var tx = db.transaction(DB_STORE, "readwrite");
+          tx.objectStore(DB_STORE).add({ blob: blob, score: score, date: new Date().toLocaleString() });
+          tx.oncomplete = function () { resolve(); };
+          tx.onerror = function () { reject(tx.error); };
+        });
+      });
+    }
+    function listFavorites() {
+      return openDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+          var out = [];
+          var tx = db.transaction(DB_STORE, "readonly");
+          var cur = tx.objectStore(DB_STORE).openCursor();
+          cur.onsuccess = function () { var c = cur.result; if (c) { out.push(c.value); c.continue(); } else resolve(out); };
+          cur.onerror = function () { reject(cur.error); };
+        });
+      });
+    }
+    function deleteFavorite(id) {
+      return openDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+          var tx = db.transaction(DB_STORE, "readwrite");
+          tx.objectStore(DB_STORE).delete(id);
+          tx.oncomplete = function () { resolve(); };
+          tx.onerror = function () { reject(tx.error); };
+        });
+      });
+    }
+
+    // Save the video you're watching into your Favorites
+    document.getElementById("saveFaveBtn").addEventListener("click", function () {
+      var btn = this;
+      if (!recBlob) { btn.textContent = "Video's not ready yet… ⏳"; return; }
+      btn.disabled = true;
+      btn.textContent = "Saving… 💾";
+      saveFavorite(recBlob, lastGameScore).then(function () {
+        btn.textContent = "✅ Saved to Favorites!";
+      }).catch(function () {
+        btn.textContent = "Couldn't save 😕";
+        btn.disabled = false;
+      });
+    });
+
+    // Build the list of saved videos
+    function renderFaves() {
+      var listEl = document.getElementById("favesList");
+      listEl.innerHTML = "<p class='hint'>Loading your videos… ⏳</p>";
+      listFavorites().then(function (items) {
+        if (!items.length) {
+          listEl.innerHTML = "<p class='hint'>No favorite videos yet! Play a game, then tap 💾 Save to Favorites. ⭐</p>";
+          return;
+        }
+        listEl.innerHTML = "";
+        items.reverse().forEach(function (it) { // newest first
+          var row = document.createElement("div"); row.className = "fave-row";
+          var label = document.createElement("span"); label.className = "fave-label";
+          label.textContent = "🎈 " + (it.score != null ? it.score + " pts" : "Game") + " · " + (it.date || "");
+          var watch = document.createElement("button"); watch.className = "smallbtn"; watch.textContent = "▶ Watch";
+          watch.addEventListener("click", function () {
+            var v = document.getElementById("faveVideo");
+            v.style.display = "";
+            v.src = URL.createObjectURL(it.blob);
+            v.currentTime = 0;
+            v.play().catch(function () {});
+          });
+          var del = document.createElement("button"); del.className = "smallbtn"; del.textContent = "🗑";
+          del.addEventListener("click", function () { deleteFavorite(it.id).then(renderFaves); });
+          row.appendChild(label); row.appendChild(watch); row.appendChild(del);
+          listEl.appendChild(row);
+        });
+      }).catch(function () {
+        listEl.innerHTML = "<p class='hint'>This browser can't keep saved videos. 😕</p>";
+      });
+    }
+    function openFaves() { document.getElementById("faves").classList.add("show"); renderFaves(); }
+    document.getElementById("favesBtn").addEventListener("click", openFaves);
+    document.getElementById("favesBtnOver").addEventListener("click", openFaves);
+    document.getElementById("favesBack").addEventListener("click", function () {
+      var v = document.getElementById("faveVideo");
+      try { v.pause(); } catch (e) {}
+      v.style.display = "none";
+      document.getElementById("faves").classList.remove("show");
     });
 
     /* ===================== THE BALLOON GAME ===================== */
@@ -907,6 +1053,7 @@
 
     function triggerGameOver() {
       gameOver = true;
+      lastGameScore = score;     // remember this game's score for the saved video
       stopRecording();           // finish the video of this game
       document.getElementById("finalScore").textContent = score;
       saveScore(score);          // remember this score
