@@ -2214,15 +2214,15 @@
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
         }
-        // show "Press A!" when the guy is close enough to grab it
+        // show "Right-click!" when the guy is close enough to grab it
         var idx = item.x - guy.x, idy = item.y - guy.y;
         if (guy.x > 0 && Math.sqrt(idx * idx + idy * idy) < 80) {
           ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
           ctx.fillStyle = "#ffd23f";
           ctx.strokeStyle = "#000";
           ctx.lineWidth = 3;
-          ctx.strokeText("Press A!", item.x, item.y - 28);
-          ctx.fillText("Press A!", item.x, item.y - 28);
+          ctx.strokeText("Right-click!", item.x, item.y - 28);
+          ctx.fillText("Right-click!", item.x, item.y - 28);
           ctx.font = "36px 'Comic Sans MS', sans-serif";
         }
       }
@@ -2346,6 +2346,28 @@
         cln.x += cln.vx; cln.y += cln.vy;
         cln.x = Math.max(20, Math.min(W - 20, cln.x));
         cln.y = Math.max(20, Math.min(H - 20, cln.y));
+        // A balloon bumping into a clone POPS the clone (he gets hurt too now!)
+        var cloneGone = false;
+        for (var cb = 0; cb < balloons.length; cb++) {
+          if (balloons[cb].boss) continue;
+          var cbx = (balloons[cb].drawX || balloons[cb].x) - cln.x;
+          var cby = balloons[cb].y - cln.y;
+          if (Math.sqrt(cbx * cbx + cby * cby) < balloons[cb].r + 13) {
+            makeSparkles(cln.x, cln.y, "#3fd0ff"); playBonk();
+            clones.splice(cl, 1); cloneGone = true; break;
+          }
+        }
+        if (cloneGone) continue;
+        // A spiky DANGER ball touching a clone POPS him too!
+        for (var cd = 0; cd < dangerBalloons.length; cd++) {
+          var cdx = dangerBalloons[cd].x - cln.x;
+          var cdy = dangerBalloons[cd].y - cln.y;
+          if (Math.sqrt(cdx * cdx + cdy * cdy) < dangerBalloons[cd].r + 13) {
+            makeSparkles(cln.x, cln.y, "#ff2a2a"); playBonk();
+            clones.splice(cl, 1); cloneGone = true; break;
+          }
+        }
+        if (cloneGone) continue;
         // auto-shoot at the target
         cln.shootTimer--;
         if (cln.shootTimer <= 0 && cltarget) {
