@@ -665,23 +665,23 @@
             startWheel(); // spin for a random prize!
           } else if (item.type === "chomper") {
             heldType = "chomp"; // holding the green Chomper ball
-            makeFloater(item.x, item.y, "GOT CHOMP BALL! Press T", "#3ddc4e");
+            makeFloater(item.x, item.y, "GOT CHOMP BALL! Left-click!", "#3ddc4e");
             playPowerup();
           } else if (item.type === "clone") {
             heldType = "clone"; // holding the red clone ball
-            makeFloater(item.x, item.y, "GOT CLONE BALL! Press T", "#ff2a2a");
+            makeFloater(item.x, item.y, "GOT CLONE BALL! Left-click!", "#ff2a2a");
             playPowerup();
           } else if (item.type === "clone50") {
             heldType = "clone50";
-            makeFloater(item.x, item.y, "50 CLONES! Press T", "#9b30ff");
+            makeFloater(item.x, item.y, "50 CLONES! Left-click!", "#9b30ff");
             playPowerup();
           } else if (item.type === "clone100") {
             heldType = "clone100";
-            makeFloater(item.x, item.y, "100 CLONES!! Press T", "#ffd23f");
+            makeFloater(item.x, item.y, "100 CLONES!! Left-click!", "#ffd23f");
             playPowerup();
           } else if (item.type === "clone300") {
             heldType = "clone300";
-            makeFloater(item.x, item.y, "✨300 CLONES!!! Press T✨", "#ffd23f");
+            makeFloater(item.x, item.y, "✨300 CLONES!!! Left-click!✨", "#ffd23f");
             playPowerup();
           } else if (item.type === "hammer") {
             hammerActive = true; hammerUntil = Date.now() + 15000; // swing for 15 seconds
@@ -724,7 +724,7 @@
       } else {
         // shift all the time-based timers forward by however long we paused
         var delta = Date.now() - pauseStart;
-        fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta; hammerUntil += delta;
+        fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta; hammerUntil += delta; hitInvulnUntil += delta;
         dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
         for (var hi = 0; hi < hearts.length; hi++) hearts[hi].born += delta; // hearts wait too
         for (var ii = 0; ii < items.length; ii++) items[ii].born += delta;   // items wait too
@@ -760,7 +760,7 @@
 
     function spawnMegaBoss() {
       bossActive = true;
-      megaBoss = { x: W / 2, y: H * 0.25, vx: 2, vy: 1.4, hp: 25, maxhp: 25, dirTimer: 0 };
+      megaBoss = { x: W / 2, y: H * 0.25, vx: 2, vy: 1.4, hp: 45, maxhp: 45, dirTimer: 0 };
     }
     var items = [];          // pickups — fly near one and press A to use it
     var itemCooldown = 350;  // frames until the next item appears
@@ -795,6 +795,7 @@
     var score = 0;
     var lives = 12;
     var gameOver = false;
+    var hitInvulnUntil = 0; // a brief shield right after a balloon bumps you
 
     function updateLives() {
       document.getElementById("livesInfo").textContent = "❤️ Lives: " + lives;
@@ -828,6 +829,7 @@
       multiCooldown = 900;
       hammerActive = false;
       hammerUntil = 0;
+      hitInvulnUntil = 0;
       escapingBalls.length = 0;
       dangerBalloons.length = 0;
       dangerCooldown = 700;
@@ -1138,7 +1140,7 @@
       bossActive = true;
       balloons.push({
         x: W / 2, y: H + 90, r: 80, speed: 0.6, sway: 0,
-        color: "#cc1111", boss: true, hp: 5
+        color: "#cc1111", boss: true, hp: 9
       });
       for (var i = 0; i < 10; i++) {
         balloons.push({
@@ -1570,7 +1572,7 @@
         if (spawnTimer > 32) { spawnTimer = 0; spawnBalloon(); spawnBalloon(); } // 2 balloons, more often!
         // Every 100 balloons, a BOSS shows up (just one, even if you overshoot)
         if (!bossActive && popCount >= nextBossAt) {
-          if (Math.random() < 0.20) spawnMegaBoss(); // 20% chance = armored boss FIGHT!
+          if (Math.random() < 0.70) spawnMegaBoss(); // 70% chance = armored boss FIGHT!
           else spawnBoss();
           while (nextBossAt <= popCount) nextBossAt += 100; // skip past the current count
         }
@@ -1616,10 +1618,12 @@
         var gdx = bx - guy.x;
         var gdy = b.y - guy.y;
         if (guy.x > 0 && !guySafe && !gameOver && !ultimateActive && !dying && !blueMode && !armorMode &&
+            Date.now() > hitInvulnUntil &&
             Math.sqrt(gdx * gdx + gdy * gdy) < b.r + gw / 2) {
           explode(guy.x, guy.y);          // KABOOM!
           playBonk();                      // soft pop-it sound
-          lives--;                         // lose a life
+          lives--;                         // lose exactly ONE life per hit
+          hitInvulnUntil = Date.now() + 1200; // brief shield so you don't lose a bunch at once
           updateLives();
           // If you were powered up but hadn't used it, the ball floats away!
           if (rainbowMode) { rainbowMode = false; loseBallFloatAway(bx, b.y, "rainbow"); }
@@ -1821,6 +1825,12 @@
         ctx.fillText("⚠️ DANGER! Hide behind a wall!", W / 2, 110);
       }
 
+      // The whole screen glows reddish while a BOSS is on the loose!
+      if ((bossActive || megaBoss) && !gameOver && !ultimateActive) {
+        ctx.fillStyle = (tick % 24 < 12) ? "rgba(200,0,0,0.16)" : "rgba(150,0,0,0.10)";
+        ctx.fillRect(0, 0, W, H);
+      }
+
       // Flashing RED/WHITE screen during the ULTIMATE
       if (ultimateActive) {
         ctx.fillStyle = (tick % 6 < 3) ? "rgba(255,0,0,0.4)" : "rgba(255,255,255,0.4)";
@@ -1865,7 +1875,7 @@
           bullets.push({ x: guy.x, y: guy.y + adir * (guy.h / 2 + 8), speed: 11, dir: adir,
                          r: 16, big: false, color: "#bfc4cc", points: 1 });
           makeSparkles(guy.x, guy.y + adir * (guy.h / 2 + 8), "#bfc4cc", 4);
-          autoFireTimer = 7;
+          autoFireTimer = 11; // fires a bit slower now = a little less damage
         }
       }
 
