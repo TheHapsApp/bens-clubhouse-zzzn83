@@ -201,6 +201,29 @@
     }
     .howlist li { margin: 6px 0; }
 
+    /* Cool Moves replay reel */
+    #replayStage {
+      background: rgba(255,255,255,0.14);
+      border: 4px dashed #fff;
+      border-radius: 28px;
+      padding: 24px 28px;
+      min-width: 280px;
+      max-width: 90vw;
+    }
+    #replayEmoji { font-size: clamp(4rem, 20vw, 8rem); line-height: 1; }
+    #replayText {
+      font-size: clamp(1.2rem, 5vw, 2rem);
+      margin-top: 10px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    }
+    #replayStars { font-size: clamp(1.4rem, 6vw, 2.2rem); margin-top: 8px; }
+    #replayStage.play { animation: clippop 0.5s ease; }
+    @keyframes clippop {
+      0%   { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+      60%  { transform: scale(1.12) rotate(3deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
     /* Game Over screen */
     #gameover {
       position: fixed;
@@ -350,7 +373,20 @@
       <ol id="lbListOver"></ol>
     </div>
     <div class="go-again">Press R to play again! 🔁</div>
+    <button id="coolBtn" class="bigbtn">🎬 See your COOL MOVES!</button>
     <button id="overTitleBtn" class="smallbtn">🏠 Title Screen</button>
+  </div>
+
+  <!-- Cool Moves replay reel -->
+  <div id="replay" class="screen">
+    <div class="screen-title">🎬 Your Coolest Moves!</div>
+    <div id="replayStage">
+      <div id="replayEmoji">🎈</div>
+      <div id="replayText">Getting your highlights…</div>
+      <div id="replayStars">⭐</div>
+    </div>
+    <div id="replayProgress" class="hint"></div>
+    <button id="replayClose" class="smallbtn">⬅ Back</button>
   </div>
 
   <script>
@@ -405,6 +441,53 @@
       started = false;
       renderLeaderboards();
       document.getElementById("title").classList.add("show");
+    });
+
+    /* ===================== COOL MOVES REPLAY REEL ===================== */
+    // Plays back your awesome moments one at a time, least cool → COOLEST!
+    var replayTimer = null;
+    function starsFor(score) {
+      var n = Math.max(1, Math.min(5, Math.round(score / 22))); // 1 to 5 stars
+      return new Array(n + 1).join("⭐");
+    }
+    function showClip(emoji, text, stars, anim) {
+      document.getElementById("replayEmoji").textContent = emoji;
+      document.getElementById("replayText").textContent = text;
+      document.getElementById("replayStars").textContent = stars;
+      if (anim) {
+        var stage = document.getElementById("replayStage");
+        stage.classList.remove("play");
+        void stage.offsetWidth; // restart the pop animation
+        stage.classList.add("play");
+      }
+    }
+    function playCoolReel() {
+      if (replayTimer) clearTimeout(replayTimer);
+      document.getElementById("replay").classList.add("show");
+      // Take your 10 coolest moments, then show them least-cool → coolest
+      var list = coolMoments.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 10);
+      list.sort(function (a, b) { return a.score - b.score; });
+      if (list.length === 0) {
+        showClip("🎈", "Play more to make some cool moves!", "", true);
+        return;
+      }
+      var i = 0;
+      (function step() {
+        if (i >= list.length) {
+          showClip("🏆", "That was AWESOME! 🎉", "⭐⭐⭐⭐⭐", true);
+          return; // ends on the trophy — press Back to close
+        }
+        var m = list[i];
+        var label = (i === list.length - 1) ? ("🥇 COOLEST: " + m.text) : m.text;
+        showClip(m.emoji, label, starsFor(m.score), true);
+        i++;
+        replayTimer = setTimeout(step, 2000);
+      })();
+    }
+    document.getElementById("coolBtn").addEventListener("click", playCoolReel);
+    document.getElementById("replayClose").addEventListener("click", function () {
+      if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+      document.getElementById("replay").classList.remove("show");
     });
 
     /* ===================== THE BALLOON GAME ===================== */
@@ -752,6 +835,13 @@
     var sparkles = [];
     var floaters = []; // little "+3" / "+5" point popups
     var hearts = [];   // falling hearts that give an extra life
+
+    // ---- COOL MOVES: remember the awesome stuff you do for a replay reel ----
+    var coolMoments = []; // each = { score, emoji, text }
+    function addCool(score, emoji, text) {
+      coolMoments.push({ score: score, emoji: emoji, text: text });
+      if (coolMoments.length > 60) coolMoments.shift(); // don't remember too many
+    }
     var popCount = 0;     // how many balloons you've popped
     var nextBossAt = 100; // a boss appears every 100 pops
     var bossActive = false;
@@ -839,6 +929,7 @@
       uHolding = false;
       dying = false;
       hearts.length = 0;
+      coolMoments.length = 0;
       popCount = 0;
       nextBossAt = 100;
       bossActive = false;
@@ -1284,6 +1375,7 @@
         score += 2; popCount++;
       });
       if (poppedList.length) { bumpScore(); playPop(); }
+      if (poppedList.length >= 4) addCool(poppedList.length * 5, "🔵", "Chain-popped " + poppedList.length + " balloons!");
     }
 
     // Press S for a little bullet. HOLD S to charge a big bullet (5x bigger)!
@@ -1524,6 +1616,7 @@
         if (gained > 0) bumpScore();
         playBoom();
         explode(guy.x, guy.y);
+        addCool(90, "🌈", "Set off the ULTIMATE explosion!");
         ultimateActive = false;
         rainbowMode = false;
         fireMode = false; // the powers are all used up
@@ -1809,6 +1902,7 @@
           score += 6;
           makeFloater(W / 2, 170, "+6 DODGED!", "#5fff8f");
           bumpScore();
+          addCool(20, "💀", "Dodged the deadly spikes!");
         }
       }
 
@@ -2010,7 +2104,7 @@
             rainbowCooldown = 600 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
             if (rainbowMode || fireMode) { triggerUltimate(); } // already powered = ULTIMATE!
-            else { rainbowMode = true; playPowerup(); }
+            else { rainbowMode = true; playPowerup(); addCool(25, "🌈", "Grabbed the RAINBOW power!"); }
           }
         }
 
@@ -2023,7 +2117,7 @@
             fireCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
             if (rainbowMode || fireMode || blueMode) { triggerUltimate(); } // already powered = ULTIMATE!
-            else { fireMode = true; fireUntil = Date.now() + 22000; playPowerup(); }
+            else { fireMode = true; fireUntil = Date.now() + 22000; playPowerup(); addCool(28, "🔥", "Went GIANT fire mode!"); }
           }
         }
 
@@ -2036,7 +2130,7 @@
             multiCooldown = 800 + Math.floor(Math.random() * 600);
             explode(bu.x, bu.y);
             if (rainbowMode || fireMode || blueMode) { triggerUltimate(); }
-            else { blueMode = true; blueUntil = Date.now() + 15000; playPowerup(); }
+            else { blueMode = true; blueUntil = Date.now() + 15000; playPowerup(); addCool(30, "🔵", "Got the BLUE chain power!"); }
           }
         }
 
@@ -2053,6 +2147,7 @@
               score += 200; bumpScore();
               spawnHeart(megaBoss.x, megaBoss.y, 2);
               playBoom();
+              addCool(100, "🤖", "BEAT the MEGA BOSS!");
               megaBoss = null; bossActive = false;
             }
             if (!bu.big) { bullets.splice(j, 1); continue; } // small bullet is used up
@@ -2079,6 +2174,7 @@
                 balloons.splice(k, 1);
                 score += 25; bumpScore(); popCount++;
                 bossActive = false;
+                addCool(45, "🎈", "Popped the giant BOSS!");
                 spawnHeart(bcx, bal.y, 2); // a 💞 worth two lives
               }
               if (!bu.big) { bullets.splice(j, 1); bulletGone = true; break; }
@@ -2291,6 +2387,7 @@
             spawnClones(num);
             makeFloater(tball.x, tball.y, num + " CLONES! 👥", "#ffd23f");
             makeSparkles(tball.x, tball.y, "#ffd23f", 24);
+            if (num >= 100) addCool(num >= 300 ? 80 : 50, "👥", "Summoned " + num + " clones!");
           } else if (tball.kind === "boom") {
             // BOOM! blow up EVERY balloon on the screen at once (+2 each)
             var bgained = 0;
@@ -2304,6 +2401,7 @@
             if (bgained > 0) bumpScore();
             for (var fx = 0; fx < 18; fx++) makeSparkles(tball.x, tball.y, "hsl(" + (fx * 14 % 50) + ", 100%, 55%)", 8);
             makeFloater(tball.x, tball.y, "💥 BOOM! 💥", "#ffd23f");
+            if (bgained >= 1) addCool(40 + bgained * 3, "🔥", "BOOM ball blew up " + bgained + " balloons!");
           } else {
             spawnChomper(tball.x, tball.y);
           }
