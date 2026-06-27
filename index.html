@@ -837,7 +837,7 @@
       chompers.length = 0;
       clones.length = 0;
       wallHoles = {};
-      for (var i = 0; i < 8; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
+      for (var i = 0; i < 16; i++) { spawnBalloon(); balloons[i].y = Math.random() * H; }
       var pt = respawnPoint(); guy.x = pt.x; guy.y = pt.y; mouse.x = pt.x; mouse.y = pt.y;
       updateLives();
       updateSuperInfo();
@@ -1037,7 +1037,7 @@
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)]
       });
     }
-    for (var i = 0; i < 8; i++) {
+    for (var i = 0; i < 16; i++) {
       spawnBalloon();
       balloons[i].y = Math.random() * H; // start scattered
     }
@@ -1553,7 +1553,7 @@
       // Spawn new balloons over time (paused once the game is over)
       if (!gameOver) {
         spawnTimer++;
-        if (spawnTimer > 70) { spawnTimer = 0; spawnBalloon(); }
+        if (spawnTimer > 32) { spawnTimer = 0; spawnBalloon(); spawnBalloon(); } // 2 balloons, more often!
         // Every 100 balloons, a BOSS shows up (just one, even if you overshoot)
         if (!bossActive && popCount >= nextBossAt) {
           if (Math.random() < 0.20) spawnMegaBoss(); // 20% chance = armored boss FIGHT!
