@@ -305,7 +305,7 @@
     <p class="gamehint">🔥 Hit the fire ball with a SUPER shot to go GIANT for 22 seconds — every pop is worth 3 points!</p>
     <p class="gamehint">🔵 SUPER-shot the blue/red/white/yellow ball to go big + blue — TOUCH balloons to pop them in a chain reaction!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
-    <p class="gamehint">🎁 Fly to a pickup item and RIGHT-CLICK to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴🟣🌈 clone balls (press T to throw!)</p>
+    <p class="gamehint">🎁 Fly to a pickup item and RIGHT-CLICK to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴🟣🌈 clone balls (CLICK or press T to throw!)</p>
     <p class="gamehint">🔨 Grab the HAMMER — it swings around you and SMASHES balloons for +5 points each for 15 seconds!</p>
     <p class="gamehint">🤖 Rarely a MEGA BOSS appears — you suit up in armor with a giant auto-gun. Blast him to win big!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
@@ -637,13 +637,20 @@
       if (e.key === "m" || e.key === "M") toggleMusic();
     });
 
-    // Press T to throw the Chomper ball
-    window.addEventListener("keydown", function (e) {
-      if (e.key !== "t" && e.key !== "T") return;
+    // Throw the ball you're holding (used by the T key AND left-click)
+    function throwHeld() {
       if (!heldType || gameOver || paused || dying || wheelActive || !started) return;
       thrownBalls.push({ x: guy.x, y: guy.y, vx: 0, vy: 5, kind: heldType });
       heldType = null;
       playShoot();
+    }
+    // Press T to throw the Chomper ball
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "t" || e.key === "T") throwHeld();
+    });
+    // Left-click to throw it too!
+    window.addEventListener("mousedown", function (e) {
+      if (e.button === 0) throwHeld(); // 0 = the left mouse button
     });
 
     // Grab a nearby pickup item — used by RIGHT-CLICK
@@ -2472,7 +2479,7 @@
         ctx.fillStyle = "#fff";
         ctx.font = "bold 16px 'Comic Sans MS', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Press T to throw!", guy.x, guy.y - gh / 2 - 42);
+        ctx.fillText("Click or press T to throw!", guy.x, guy.y - gh / 2 - 42);
       }
 
       } // end if (!dying)
