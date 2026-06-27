@@ -201,27 +201,14 @@
     }
     .howlist li { margin: 6px 0; }
 
-    /* Cool Moves replay reel */
-    #replayStage {
-      background: rgba(255,255,255,0.14);
-      border: 4px dashed #fff;
-      border-radius: 28px;
-      padding: 24px 28px;
-      min-width: 280px;
-      max-width: 90vw;
-    }
-    #replayEmoji { font-size: clamp(4rem, 20vw, 8rem); line-height: 1; }
-    #replayText {
-      font-size: clamp(1.2rem, 5vw, 2rem);
-      margin-top: 10px;
-      text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
-    }
-    #replayStars { font-size: clamp(1.4rem, 6vw, 2.2rem); margin-top: 8px; }
-    #replayStage.play { animation: clippop 0.5s ease; }
-    @keyframes clippop {
-      0%   { transform: scale(0.6) rotate(-6deg); opacity: 0; }
-      60%  { transform: scale(1.12) rotate(3deg); opacity: 1; }
-      100% { transform: scale(1) rotate(0deg); }
+    /* Cool Moves video replay */
+    #replayVideo {
+      width: min(90vw, 820px);
+      max-height: 62vh;
+      background: #000;
+      border: 5px solid #fff;
+      border-radius: 20px;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.3);
     }
 
     /* Game Over screen */
@@ -377,15 +364,11 @@
     <button id="overTitleBtn" class="smallbtn">🏠 Title Screen</button>
   </div>
 
-  <!-- Cool Moves replay reel -->
+  <!-- Cool Moves video replay -->
   <div id="replay" class="screen">
-    <div class="screen-title">🎬 Your Coolest Moves!</div>
-    <div id="replayStage">
-      <div id="replayEmoji">🎈</div>
-      <div id="replayText">Getting your highlights…</div>
-      <div id="replayStars">⭐</div>
-    </div>
-    <div id="replayProgress" class="hint"></div>
+    <div class="screen-title">🎬 Your Game Replay!</div>
+    <video id="replayVideo" playsinline muted loop controls></video>
+    <div id="replayProgress" class="hint">Here's the real video of everything you did! ▶</div>
     <button id="replayClose" class="smallbtn">⬅ Back</button>
   </div>
 
@@ -443,50 +426,81 @@
       document.getElementById("title").classList.add("show");
     });
 
-    /* ===================== COOL MOVES REPLAY REEL ===================== */
-    // Plays back your awesome moments one at a time, least cool → COOLEST!
-    var replayTimer = null;
-    function starsFor(score) {
-      var n = Math.max(1, Math.min(5, Math.round(score / 22))); // 1 to 5 stars
-      return new Array(n + 1).join("⭐");
-    }
-    function showClip(emoji, text, stars, anim) {
-      document.getElementById("replayEmoji").textContent = emoji;
-      document.getElementById("replayText").textContent = text;
-      document.getElementById("replayStars").textContent = stars;
-      if (anim) {
-        var stage = document.getElementById("replayStage");
-        stage.classList.remove("play");
-        void stage.offsetWidth; // restart the pop animation
-        stage.classList.add("play");
+    /* ===================== COOL MOVES VIDEO REPLAY ===================== */
+    // We RECORD the real game canvas while you play, then play it back as a video!
+    var mediaRecorder = null;   // the thing recording the screen
+    var recURL = null;          // the finished video's web address
+    var recSupported = true;    // false if this browser can't record
+    var recReady = false;       // true once a finished video is ready to watch
+
+    // Find a video format this browser can record
+    function pickRecMime() {
+      var types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+      for (var i = 0; i < types.length; i++) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(types[i])) return types[i];
       }
+      return "";
     }
+
+    function startRecording() {
+      recReady = false;
+      if (!window.MediaRecorder || !canvas.captureStream) { recSupported = false; return; }
+      stopRecording(); // stop any earlier recording first
+      try {
+        var chunks = []; // this game's video pieces (kept private to this recorder)
+        var stream = canvas.captureStream(30); // 30 pictures per second of the game
+        var mime = pickRecMime();
+        var opts = mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : undefined;
+        var mr = new MediaRecorder(stream, opts);
+        mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        mr.onstop = function () {
+          if (!chunks.length) return;
+          if (recURL) URL.revokeObjectURL(recURL);
+          recURL = URL.createObjectURL(new Blob(chunks, { type: mr.mimeType || "video/webm" }));
+          recReady = true;
+          var vid = document.getElementById("replayVideo");
+          vid.src = recURL;
+          // if the replay screen is already open and waiting, start playing now
+          if (document.getElementById("replay").classList.contains("show")) {
+            document.getElementById("replayProgress").textContent = "Here's the real video of everything you did! ▶";
+            vid.play().catch(function () {});
+          }
+        };
+        mr.start(1000); // save a piece every second
+        mediaRecorder = mr;
+      } catch (e) { recSupported = false; mediaRecorder = null; }
+    }
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        try { mediaRecorder.stop(); } catch (e) {}
+      }
+      mediaRecorder = null;
+    }
+
     function playCoolReel() {
-      if (replayTimer) clearTimeout(replayTimer);
+      var vid = document.getElementById("replayVideo");
+      var msg = document.getElementById("replayProgress");
       document.getElementById("replay").classList.add("show");
-      // Take your 10 coolest moments, then show them least-cool → coolest
-      var list = coolMoments.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 10);
-      list.sort(function (a, b) { return a.score - b.score; });
-      if (list.length === 0) {
-        showClip("🎈", "Play more to make some cool moves!", "", true);
+      if (!recSupported) {
+        vid.style.display = "none";
+        msg.textContent = "This browser can't record a video — but you did awesome! 🎉";
         return;
       }
-      var i = 0;
-      (function step() {
-        if (i >= list.length) {
-          showClip("🏆", "That was AWESOME! 🎉", "⭐⭐⭐⭐⭐", true);
-          return; // ends on the trophy — press Back to close
-        }
-        var m = list[i];
-        var label = (i === list.length - 1) ? ("🥇 COOLEST: " + m.text) : m.text;
-        showClip(m.emoji, label, starsFor(m.score), true);
-        i++;
-        replayTimer = setTimeout(step, 2000);
-      })();
+      vid.style.display = "";
+      if (recReady && recURL) {
+        if (vid.src !== recURL) vid.src = recURL;
+        msg.textContent = "Here's the real video of everything you did! ▶";
+        vid.currentTime = 0;
+        vid.play().catch(function () {});
+      } else {
+        // the video is still being put together — it'll auto-play when it's ready
+        msg.textContent = "Getting your video ready… 🎬";
+      }
     }
     document.getElementById("coolBtn").addEventListener("click", playCoolReel);
     document.getElementById("replayClose").addEventListener("click", function () {
-      if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+      var vid = document.getElementById("replayVideo");
+      try { vid.pause(); } catch (e) {}
       document.getElementById("replay").classList.remove("show");
     });
 
@@ -893,6 +907,7 @@
 
     function triggerGameOver() {
       gameOver = true;
+      stopRecording();           // finish the video of this game
       document.getElementById("finalScore").textContent = score;
       saveScore(score);          // remember this score
       renderLeaderboards();      // refresh the high-score lists
@@ -948,6 +963,7 @@
       updateSuperInfo();
       scoreNum.textContent = "0";
       document.getElementById("gameover").classList.remove("show");
+      startRecording(); // start filming this brand-new game!
     }
 
     // Press R to play again after Game Over
