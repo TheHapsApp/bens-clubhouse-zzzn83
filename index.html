@@ -389,7 +389,7 @@
   <!-- Cool Moves video replay -->
   <div id="replay" class="screen">
     <div class="screen-title">🎬 Your Game Replay!</div>
-    <video id="replayVideo" playsinline muted loop controls></video>
+    <video id="replayVideo" playsinline loop controls></video>
     <div id="replayProgress" class="hint">Here's the real video of everything you did! ▶</div>
     <div>
       <button id="saveFaveBtn" class="smallbtn">💾 Save to Favorites</button>
@@ -400,7 +400,7 @@
   <!-- Your Favorite Videos gallery -->
   <div id="faves" class="screen">
     <div class="screen-title">⭐ Your Favorite Videos</div>
-    <video id="faveVideo" playsinline muted loop controls style="display:none"></video>
+    <video id="faveVideo" playsinline loop controls style="display:none"></video>
     <div id="favesList" class="faves-list"></div>
     <button id="favesBack" class="smallbtn">⬅ Back</button>
   </div>
@@ -468,9 +468,9 @@
     var recReady = false;       // true once a finished video is ready to watch
     var lastGameScore = 0;      // the score of the game we just recorded
 
-    // Find a video format this browser can record
+    // Find a video format this browser can record (with sound = opus!)
     function pickRecMime() {
-      var types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+      var types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
       for (var i = 0; i < types.length; i++) {
         if (window.MediaRecorder && MediaRecorder.isTypeSupported(types[i])) return types[i];
       }
@@ -484,6 +484,11 @@
       try {
         var chunks = []; // this game's video pieces (kept private to this recorder)
         var stream = canvas.captureStream(30); // 30 pictures per second of the game
+        // Add the game's SOUND to the recording too!
+        ensureAudio();
+        if (recDest && recDest.stream) {
+          recDest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+        }
         var mime = pickRecMime();
         var opts = mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : undefined;
         var mr = new MediaRecorder(stream, opts);
@@ -663,10 +668,21 @@
 
     /* ---- Sound effects (made by the browser, no files needed) ---- */
     var audioCtx = null;
+    var masterGain = null;  // every sound goes through here...
+    var recDest = null;     // ...so we can ALSO copy the sound into the video recording
     function ensureAudio() {
       if (!audioCtx) {
         try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
         catch (e) { audioCtx = null; }
+        if (audioCtx) {
+          // master volume node → goes to the speakers
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 1;
+          masterGain.connect(audioCtx.destination);
+          // ...and ALSO into a stream we can record into the video
+          try { recDest = audioCtx.createMediaStreamDestination(); masterGain.connect(recDest); }
+          catch (e) { recDest = null; }
+        }
       }
       if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
       return audioCtx;
@@ -680,7 +696,7 @@
       o.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.12);
       g.gain.setValueAtTime(0.15, ac.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
-      o.connect(g); g.connect(ac.destination);
+      o.connect(g); g.connect(masterGain);
       o.start(); o.stop(ac.currentTime + 0.13);
     }
     // Rising "powering up" sound while you hold S to charge the super shot
@@ -695,7 +711,7 @@
       chargeOsc.frequency.linearRampToValueAtTime(950, ac.currentTime + CHARGE_MS / 1000);
       chargeGain.gain.setValueAtTime(0.0001, ac.currentTime);
       chargeGain.gain.linearRampToValueAtTime(0.05, ac.currentTime + 0.05);
-      chargeOsc.connect(chargeGain); chargeGain.connect(ac.destination);
+      chargeOsc.connect(chargeGain); chargeGain.connect(masterGain);
       chargeOsc.start();
     }
     function stopChargeSound() {
@@ -719,7 +735,7 @@
       var src = ac.createBufferSource(); src.buffer = buffer;
       var filt = ac.createBiquadFilter(); filt.type = "bandpass"; filt.frequency.value = 1100;
       var g = ac.createGain(); g.gain.value = 0.5;
-      src.connect(filt); filt.connect(g); g.connect(ac.destination);
+      src.connect(filt); filt.connect(g); g.connect(masterGain);
       src.start();
     }
 
@@ -732,7 +748,7 @@
       o.frequency.exponentialRampToValueAtTime(120, ac.currentTime + 0.14);
       g.gain.setValueAtTime(0.12, ac.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.16);
-      o.connect(g); g.connect(ac.destination);
+      o.connect(g); g.connect(masterGain);
       o.start(); o.stop(ac.currentTime + 0.17);
     }
 
@@ -748,7 +764,7 @@
         g.gain.setValueAtTime(0.0001, t);
         g.gain.linearRampToValueAtTime(0.18, t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.001, t + n[1]);
-        o.connect(g); g.connect(ac.destination);
+        o.connect(g); g.connect(masterGain);
         o.start(t); o.stop(t + n[1] + 0.02);
         t += n[1];
       });
@@ -766,7 +782,7 @@
         g.gain.setValueAtTime(0.0001, t);
         g.gain.linearRampToValueAtTime(0.16, t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-        o.connect(g); g.connect(ac.destination);
+        o.connect(g); g.connect(masterGain);
         o.start(t); o.stop(t + 0.13);
         t += 0.09;
       });
@@ -782,7 +798,7 @@
         g.gain.setValueAtTime(0.0001, t);
         g.gain.linearRampToValueAtTime(0.18, t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-        o.connect(g); g.connect(ac.destination);
+        o.connect(g); g.connect(masterGain);
         o.start(t); o.stop(t + 0.34);
         t += 0.36;
       }
@@ -797,7 +813,7 @@
       var src = ac.createBufferSource(); src.buffer = buffer;
       var filt = ac.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 500;
       var g = ac.createGain(); g.gain.value = 0.6;
-      src.connect(filt); filt.connect(g); g.connect(ac.destination);
+      src.connect(filt); filt.connect(g); g.connect(masterGain);
       src.start();
     }
 
@@ -842,7 +858,7 @@
       g.gain.setValueAtTime(0.0001, start);
       g.gain.linearRampToValueAtTime(vol, start + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, start + dur);
-      o.connect(g); g.connect(ac.destination);
+      o.connect(g); g.connect(masterGain);
       o.start(start); o.stop(start + dur + 0.02);
     }
 
