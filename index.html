@@ -80,6 +80,23 @@
       box-shadow: 0 3px 0 rgba(0,0,0,0.2);
     }
     #pauseBtn:active { transform: translateY(2px); box-shadow: none; }
+    /* "How long you've been alive" box, top-left */
+    #aliveBox {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 15;
+      display: none;
+      font-family: inherit;
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #6a2cff;
+      background: #fff;
+      border: 3px solid #6a2cff;
+      border-radius: 16px;
+      padding: 8px 14px;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    }
     #musicBtn.jitter { animation: jitter 0.12s linear 6; }
     @keyframes jitter {
       0%   { transform: translate(0, 0) rotate(0deg); }
@@ -325,6 +342,7 @@
   <canvas id="game"></canvas>
   <button id="musicBtn" type="button">🎵 Music: Off</button>
   <button id="pauseBtn" type="button">⏸ Pause</button>
+  <div id="aliveBox">⏱ 0:00</div>
 
   <div class="content">
     <h1>💥🔴 BLASTROID 🔴💥</h1>
@@ -995,6 +1013,7 @@
         // shift all the time-based timers forward by however long we paused
         var delta = Date.now() - pauseStart;
         fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta; hammerUntil += delta; hitInvulnUntil += delta;
+        gameStartedAt += delta; // don't count paused time as "alive" time
         dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
         for (var hi = 0; hi < hearts.length; hi++) hearts[hi].born += delta; // hearts wait too
         for (var ii = 0; ii < items.length; ii++) items[ii].born += delta;   // items wait too
@@ -1073,6 +1092,7 @@
     var lives = 12;
     var gameOver = false;
     var hitInvulnUntil = 0; // a brief shield right after a balloon bumps you
+    var gameStartedAt = 0;  // when this game began (for the "alive" timer)
 
     function updateLives() {
       document.getElementById("livesInfo").textContent = "❤️ Lives: " + lives;
@@ -1137,6 +1157,7 @@
       updateSuperInfo();
       scoreNum.textContent = "0";
       document.getElementById("gameover").classList.remove("show");
+      gameStartedAt = Date.now(); // start the "how long you've been alive" clock
       startRecording(); // start filming this brand-new game!
     }
 
@@ -1616,6 +1637,15 @@
       }
     }
     setInterval(updateSuperInfo, 250); // keep the recharge timer ticking
+
+    // Keep the "how long you've been alive" box ticking
+    function updateAliveBox() {
+      var box = document.getElementById("aliveBox");
+      if (!started) { box.style.display = "none"; return; }
+      box.style.display = "block";
+      if (!paused && !gameOver) box.textContent = "⏱ " + fmtTime(Date.now() - gameStartedAt);
+    }
+    setInterval(updateAliveBox, 250);
 
     function shoot(big) {
       if (gameOver || paused || dying || wheelActive) return; // no shooting then
