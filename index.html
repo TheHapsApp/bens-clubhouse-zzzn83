@@ -80,6 +80,43 @@
       box-shadow: 0 3px 0 rgba(0,0,0,0.2);
     }
     #pauseBtn:active { transform: translateY(2px); box-shadow: none; }
+    /* On-screen touch controls (phones/tablets only) */
+    #touchControls {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 14px;
+      z-index: 16;
+      display: none; /* turned on by JS when a touch screen is detected */
+      justify-content: center;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: none; /* taps BETWEEN buttons still move your guy */
+    }
+    body.touch #touchControls { display: flex; }
+    /* Show/hide hint lines depending on touch vs mouse */
+    .gamehint.touchonly { display: none; }
+    body.touch .gamehint.touchonly { display: inline-block; }
+    .touchctrl {
+      pointer-events: auto;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      font-family: inherit; font-weight: bold;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 66px; height: 66px;
+      font-size: 1.7rem; line-height: 1;
+      color: #6a2cff;
+      background: rgba(255,255,255,0.92);
+      border: 3px solid #6a2cff;
+      border-radius: 18px;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    }
+    .touchctrl small { font-size: 0.6rem; margin-top: 3px; }
+    .touchctrl.big {
+      width: 88px; height: 88px; font-size: 2.2rem;
+      color: #1a6e2e; background: #5fff8f; border-color: #1a6e2e;
+    }
+    .touchctrl:active { transform: translateY(2px); box-shadow: none; }
+
     /* "How long you've been alive" box, top-left */
     #aliveBox {
       position: fixed;
@@ -344,9 +381,18 @@
   <button id="pauseBtn" type="button">⏸ Pause</button>
   <div id="aliveBox">⏱ 0:00</div>
 
+  <!-- On-screen buttons for phones + tablets -->
+  <div id="touchControls">
+    <button class="touchctrl" id="tcGrab" type="button">🤚<small>Grab</small></button>
+    <button class="touchctrl" id="tcThrow" type="button">🤾<small>Throw</small></button>
+    <button class="touchctrl big" id="tcFire" type="button">🔫<small>Shoot</small></button>
+    <button class="touchctrl" id="tcBomb" type="button">💥<small>Bomb</small></button>
+  </div>
+
   <div class="content">
     <h1>💥🔴 BLASTROID 🔴💥</h1>
     <p class="gamehint">🔺 Move your mouse and the guy follows it! Press S to shoot balloons!</p>
+    <p class="gamehint touchonly">📱 Drag your finger to fly! Use the buttons at the bottom: 🔫 Shoot (hold for a SUPER shot) · 🤚 Grab items · 🤾 Throw balls · 💥 Bomb</p>
     <p class="gamehint" id="superInfo">💥 Super shots left: 10</p>
     <p class="gamehint" id="livesInfo">❤️ Lives: 12</p>
     <p class="gamehint">🌈 Hit the rainbow ball with a SUPER shot, then press U to blow up balloons!</p>
@@ -937,8 +983,9 @@
     window.addEventListener("keydown", function (e) {
       if (e.key === "t" || e.key === "T") throwHeld();
     });
-    // Left-click to throw it too!
+    // Left-click to throw it too! (but not on touch screens — they use the Throw button)
     window.addEventListener("mousedown", function (e) {
+      if (document.body.classList.contains("touch")) return;
       if (e.button === 0) throwHeld(); // 0 = the left mouse button
     });
 
@@ -1226,13 +1273,40 @@
       mouse.x = e.clientX;
       mouse.y = e.clientY;
     });
-    // Works on tablets/phones too — drag your finger
-    window.addEventListener("touchmove", function (e) {
-      if (e.touches[0]) {
-        mouse.x = e.touches[0].clientX;
-        mouse.y = e.touches[0].clientY;
-      }
-    }, { passive: true });
+    // Works on tablets/phones too — drag your finger to fly
+    function onControl(t) {
+      return t && t.target && t.target.closest &&
+        t.target.closest(".touchctrl, #musicBtn, #pauseBtn, .screen, #gameover");
+    }
+    function moveFromTouch(e) {
+      var t = e.touches[0];
+      if (!t) return;
+      if (onControl(t)) return;            // touching a button shouldn't move your guy
+      if (started && !gameOver) e.preventDefault(); // keep the page still while flying
+      mouse.x = t.clientX;
+      mouse.y = t.clientY;
+    }
+    window.addEventListener("touchstart", moveFromTouch, { passive: false });
+    window.addEventListener("touchmove", moveFromTouch, { passive: false });
+
+    // ---- Show on-screen buttons on phones/tablets ----
+    if (("ontouchstart" in window) || navigator.maxTouchPoints > 0) {
+      document.body.classList.add("touch");
+    }
+    // Pretend to press a keyboard key (so the buttons reuse the real game controls)
+    function pressKey(k) { window.dispatchEvent(new KeyboardEvent("keydown", { key: k })); }
+    function releaseKey(k) { window.dispatchEvent(new KeyboardEvent("keyup", { key: k })); }
+    var tcFire = document.getElementById("tcFire");
+    // Hold to charge a SUPER shot, let go to fire (same as holding the S key)
+    tcFire.addEventListener("pointerdown", function (e) { e.preventDefault(); pressKey("s"); });
+    tcFire.addEventListener("pointerup", function (e) { e.preventDefault(); releaseKey("s"); });
+    tcFire.addEventListener("pointercancel", function () { releaseKey("s"); });
+    tcFire.addEventListener("pointerleave", function () { if (isCharging) releaseKey("s"); });
+    document.getElementById("tcGrab").addEventListener("click", function () { tryPickup(); });
+    document.getElementById("tcThrow").addEventListener("click", function () { throwHeld(); });
+    document.getElementById("tcBomb").addEventListener("click", function () {
+      pressKey("u"); setTimeout(function () { releaseKey("u"); }, 60); // quick tap = no overheat
+    });
 
     // Walls + squares. Brown = safe (hide here). Red = DON'T TOUCH (kaboom!)
     function getWalls() {
