@@ -306,6 +306,7 @@
     <p class="gamehint">🔵 SUPER-shot the blue/red/white/yellow ball to go big + blue — TOUCH balloons to pop them in a chain reaction!</p>
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <p class="gamehint">🎁 Fly to a pickup item and RIGHT-CLICK to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴🟣🌈 clone balls (press T to throw!)</p>
+    <p class="gamehint">🔨 Grab the HAMMER — it swings around you and SMASHES balloons for +5 points each for 15 seconds!</p>
     <p class="gamehint">🤖 Rarely a MEGA BOSS appears — you suit up in armor with a giant auto-gun. Blast him to win big!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
@@ -674,6 +675,10 @@
             heldType = "clone300";
             makeFloater(item.x, item.y, "✨300 CLONES!!! Press T✨", "#ffd23f");
             playPowerup();
+          } else if (item.type === "hammer") {
+            hammerActive = true; hammerUntil = Date.now() + 15000; // swing for 15 seconds
+            makeFloater(item.x, item.y, "GOT HAMMER! 🔨 +5 each!", "#caa06a");
+            playPowerup();
           } else {
             usePickup();
             makeFloater(item.x, item.y, "POP-A-RAMA!", "#ffd23f");
@@ -707,7 +712,7 @@
       } else {
         // shift all the time-based timers forward by however long we paused
         var delta = Date.now() - pauseStart;
-        fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta;
+        fireUntil += delta; ultimateUntil += delta; superLockedUntil += delta; hammerUntil += delta;
         dangerWarnUntil += delta; dangerSpawnAt += delta; tryingUntil += delta; uHoldStart += delta;
         for (var hi = 0; hi < hearts.length; hi++) hearts[hi].born += delta; // hearts wait too
         for (var ii = 0; ii < items.length; ii++) items[ii].born += delta;   // items wait too
@@ -809,6 +814,8 @@
       multiBall = null;
       blueMode = false;
       multiCooldown = 900;
+      hammerActive = false;
+      hammerUntil = 0;
       escapingBalls.length = 0;
       dangerBalloons.length = 0;
       dangerCooldown = 700;
@@ -1061,8 +1068,10 @@
         items.push({ x: x, y: y, born: Date.now(), type: "clone" });    // red ball = 5 clones
       } else if (roll < 0.82) {
         items.push({ x: x, y: y, born: Date.now(), type: "clone50" });  // purple ball = 50 clones
-      } else if (roll < 0.90) {
+      } else if (roll < 0.88) {
         items.push({ x: x, y: y, born: Date.now(), type: "clone100" }); // rainbow ball = 100 clones
+      } else if (roll < 0.96) {
+        items.push({ x: x, y: y, born: Date.now(), type: "hammer" });   // 🔨 swing hammer = +5 per balloon!
       } else {
         var emojis = ["💣", "⚡", "⭐", "🎁"];
         items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
@@ -1220,6 +1229,11 @@
     var blueUntil = 0;
     var multiCooldown = 900;
     var MULTI_COLORS = ["#3f62ff", "#ff2a2a", "#ffffff", "#ffd23f"]; // blue red white yellow
+
+    // ---- The HAMMER power-up (swings around you, smashes balloons for +5 each!) ----
+    var hammerActive = false;   // is the hammer spinning around the guy?
+    var hammerUntil = 0;        // time when the hammer goes away
+    var hammerAngle = 0;        // which way the hammer is pointing right now
 
     function spawnMultiBall() {
       multiBall = {
@@ -1617,6 +1631,34 @@
           if (Math.sqrt(tdx * tdx + tdy * tdy) < gw / 2 + balloons[tbp].r) {
             chainPop(balloons[tbp]);
             break; // one chain per frame
+          }
+        }
+      }
+
+      // ---- HAMMER: swings around you and SMASHES balloons for +5 each! ----
+      if (hammerActive && Date.now() > hammerUntil) hammerActive = false; // wears off
+      if (hammerActive && guy.x > 0 && !dying && !gameOver) {
+        hammerAngle += 0.26; // how fast it whirls around
+        var hammerLen = gw / 2 + 58;
+        var hhx = guy.x + Math.cos(hammerAngle) * hammerLen; // hammer head x
+        var hhy = guy.y + Math.sin(hammerAngle) * hammerLen; // hammer head y
+        // wooden handle from the guy out to the head
+        ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 8; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(guy.x, guy.y); ctx.lineTo(hhx, hhy); ctx.stroke();
+        ctx.lineCap = "butt";
+        // the hammer head
+        ctx.font = "44px 'Comic Sans MS', sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("🔨", hhx, hhy + 15);
+        // smash every balloon the head touches → +5 points each!
+        for (var hb = balloons.length - 1; hb >= 0; hb--) {
+          var hbal = balloons[hb];
+          if (hbal.boss) continue; // the hammer can't smash the boss
+          var hdx = (hbal.drawX || hbal.x) - hhx, hdy = hbal.y - hhy;
+          if (Math.sqrt(hdx * hdx + hdy * hdy) < hbal.r + 28) {
+            makeSparkles(hbal.drawX || hbal.x, hbal.y, hbal.color);
+            makeFloater(hbal.drawX || hbal.x, hbal.y, "+5", "#ffd23f");
+            balloons.splice(hb, 1); score += 5; popCount++;
+            bumpScore(); playPop();
           }
         }
       }
@@ -2164,6 +2206,10 @@
           ctx.restore();
           ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.arc(item.x, item.y, 22, 0, Math.PI * 2); ctx.stroke();
+        } else if (item.type === "hammer") {
+          // the 🔨 hammer pickup
+          ctx.font = "40px 'Comic Sans MS', sans-serif";
+          ctx.fillText("🔨", item.x, item.y + 14);
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
