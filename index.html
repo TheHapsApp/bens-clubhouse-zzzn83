@@ -467,6 +467,8 @@
     var recSupported = true;    // false if this browser can't record
     var recReady = false;       // true once a finished video is ready to watch
     var lastGameScore = 0;      // the score of the game we just recorded
+    var recStartedAt = 0;       // when the current recording began
+    var lastVideoMs = 0;        // how long the finished video is, in milliseconds
 
     // Find a video format this browser can record (with sound = opus!)
     function pickRecMime() {
@@ -495,6 +497,7 @@
         mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         mr.onstop = function () {
           if (!chunks.length) return;
+          lastVideoMs = Date.now() - recStartedAt; // how long this video turned out to be
           if (recURL) URL.revokeObjectURL(recURL);
           recBlob = new Blob(chunks, { type: mr.mimeType || "video/webm" });
           recURL = URL.createObjectURL(recBlob);
@@ -508,6 +511,7 @@
           }
         };
         mr.start(1000); // save a piece every second
+        recStartedAt = Date.now();
         mediaRecorder = mr;
       } catch (e) { recSupported = false; mediaRecorder = null; }
     }
@@ -568,15 +572,21 @@
         req.onerror = function () { reject(req.error); };
       });
     }
-    function saveFavorite(blob, score) {
+    function saveFavorite(blob, score, ms) {
       return openDB().then(function (db) {
         return new Promise(function (resolve, reject) {
           var tx = db.transaction(DB_STORE, "readwrite");
-          tx.objectStore(DB_STORE).add({ blob: blob, score: score, date: new Date().toLocaleString() });
+          tx.objectStore(DB_STORE).add({ blob: blob, score: score, ms: ms, date: new Date().toLocaleString() });
           tx.oncomplete = function () { resolve(); };
           tx.onerror = function () { reject(tx.error); };
         });
       });
+    }
+    // Turn milliseconds into a "1:23" style time
+    function fmtTime(ms) {
+      var total = Math.round((ms || 0) / 1000);
+      var mins = Math.floor(total / 60), secs = total % 60;
+      return mins + ":" + (secs < 10 ? "0" + secs : secs);
     }
     function listFavorites() {
       return openDB().then(function (db) {
@@ -606,7 +616,7 @@
       if (!recBlob) { btn.textContent = "Video's not ready yet… ⏳"; return; }
       btn.disabled = true;
       btn.textContent = "Saving… 💾";
-      saveFavorite(recBlob, lastGameScore).then(function () {
+      saveFavorite(recBlob, lastGameScore, lastVideoMs).then(function () {
         btn.textContent = "✅ Saved to Favorites!";
       }).catch(function () {
         btn.textContent = "Couldn't save 😕";
@@ -627,7 +637,8 @@
         items.reverse().forEach(function (it) { // newest first
           var row = document.createElement("div"); row.className = "fave-row";
           var label = document.createElement("span"); label.className = "fave-label";
-          label.textContent = "🎈 " + (it.score != null ? it.score + " pts" : "Game") + " · " + (it.date || "");
+          label.textContent = "🎈 " + (it.score != null ? it.score + " pts" : "Game") +
+            (it.ms != null ? " · ⏱ " + fmtTime(it.ms) : "") + " · " + (it.date || "");
           var watch = document.createElement("button"); watch.className = "smallbtn"; watch.textContent = "▶ Watch";
           watch.addEventListener("click", function () {
             var v = document.getElementById("faveVideo");
