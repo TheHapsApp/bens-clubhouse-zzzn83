@@ -307,6 +307,7 @@
     <p class="gamehint">🟦 Fly into your home base square to be safe from balloons!</p>
     <p class="gamehint">🎁 Fly to a pickup item and RIGHT-CLICK to grab it! 🟡 prize wheel • 🟢 Chomper ball • 🔴🟣🌈 clone balls (CLICK or press T to throw!)</p>
     <p class="gamehint">🔨 Grab the HAMMER — it swings around you and SMASHES balloons for +5 points each for 15 seconds!</p>
+    <p class="gamehint">🔥 Grab the red/orange/yellow BOOM ball, then CLICK to throw it — when it hits something, EVERY balloon on screen blows up!</p>
     <p class="gamehint">🤖 Rarely a MEGA BOSS appears — you suit up in armor with a giant auto-gun. Blast him to win big!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
@@ -685,6 +686,10 @@
           } else if (item.type === "hammer") {
             hammerActive = true; hammerUntil = Date.now() + 15000; // swing for 15 seconds
             makeFloater(item.x, item.y, "GOT HAMMER! 🔨 +5 each!", "#caa06a");
+            playPowerup();
+          } else if (item.type === "boom") {
+            heldType = "boom"; // holding the red/orange/yellow BOOM ball
+            makeFloater(item.x, item.y, "GOT BOOM BALL! 🔥 Throw it!", "#ff6a00");
             playPowerup();
           } else {
             usePickup();
@@ -1075,10 +1080,12 @@
         items.push({ x: x, y: y, born: Date.now(), type: "clone" });    // red ball = 5 clones
       } else if (roll < 0.82) {
         items.push({ x: x, y: y, born: Date.now(), type: "clone50" });  // purple ball = 50 clones
-      } else if (roll < 0.88) {
+      } else if (roll < 0.86) {
         items.push({ x: x, y: y, born: Date.now(), type: "clone100" }); // rainbow ball = 100 clones
-      } else if (roll < 0.96) {
+      } else if (roll < 0.92) {
         items.push({ x: x, y: y, born: Date.now(), type: "hammer" });   // 🔨 swing hammer = +5 per balloon!
+      } else if (roll < 0.97) {
+        items.push({ x: x, y: y, born: Date.now(), type: "boom" });     // 🔥 red/orange/yellow ball = blow up EVERY balloon!
       } else {
         var emojis = ["💣", "⚡", "⭐", "🎁"];
         items.push({ x: x, y: y, born: Date.now(), type: "pop", emoji: emojis[Math.floor(Math.random() * emojis.length)] });
@@ -2217,6 +2224,14 @@
           // the 🔨 hammer pickup
           ctx.font = "40px 'Comic Sans MS', sans-serif";
           ctx.fillText("🔨", item.x, item.y + 14);
+        } else if (item.type === "boom") {
+          // a red/orange/yellow fire ball — throw it to blow up EVERY balloon!
+          for (var br = 3; br >= 1; br--) {
+            ctx.fillStyle = "hsl(" + ((tick * 8 + br * 16) % 50) + ", 100%, 55%)";
+            ctx.beginPath(); ctx.arc(item.x, item.y, 17 * br / 3, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(item.x, item.y, 17, 0, Math.PI * 2); ctx.stroke();
         } else {
           ctx.font = "36px 'Comic Sans MS', sans-serif";
           ctx.fillText(item.emoji, item.x, item.y);
@@ -2243,6 +2258,7 @@
         if (tball.kind === "clone") tcol = "#ff2a2a";
         else if (tball.kind === "clone50") tcol = "#9b30ff";
         else if (tball.kind === "clone100" || tball.kind === "clone300") tcol = "hsl(" + (tick * 8 % 360) + ", 100%, 60%)";
+        else if (tball.kind === "boom") tcol = "hsl(" + (tick * 8 % 50) + ", 100%, 55%)"; // fiery red/orange/yellow
         ctx.save();
         if (tball.kind === "clone300") { ctx.shadowBlur = 20; ctx.shadowColor = tcol; }
         ctx.fillStyle = tcol;
@@ -2265,6 +2281,19 @@
             spawnClones(num);
             makeFloater(tball.x, tball.y, num + " CLONES! 👥", "#ffd23f");
             makeSparkles(tball.x, tball.y, "#ffd23f", 24);
+          } else if (tball.kind === "boom") {
+            // BOOM! blow up EVERY balloon on the screen at once (+2 each)
+            var bgained = 0;
+            for (var bk = balloons.length - 1; bk >= 0; bk--) {
+              var bbal = balloons[bk];
+              if (bbal.boss) continue; // the boss is too tough for the boom
+              makeSparkles(bbal.drawX || bbal.x, bbal.y, bbal.color);
+              makeFloater(bbal.drawX || bbal.x, bbal.y, "+2", "#ff6a00");
+              balloons.splice(bk, 1); score += 2; popCount++; bgained++;
+            }
+            if (bgained > 0) bumpScore();
+            for (var fx = 0; fx < 18; fx++) makeSparkles(tball.x, tball.y, "hsl(" + (fx * 14 % 50) + ", 100%, 55%)", 8);
+            makeFloater(tball.x, tball.y, "💥 BOOM! 💥", "#ffd23f");
           } else {
             spawnChomper(tball.x, tball.y);
           }
@@ -2473,6 +2502,7 @@
         if (heldType === "clone") hcol = "#ff2a2a";
         else if (heldType === "clone50") hcol = "#9b30ff";
         else if (heldType === "clone100" || heldType === "clone300") hcol = "hsl(" + (tick * 8 % 360) + ", 100%, 60%)";
+        else if (heldType === "boom") hcol = "hsl(" + (tick * 8 % 50) + ", 100%, 55%)"; // fiery boom ball
         ctx.fillStyle = hcol;
         ctx.beginPath(); ctx.arc(guy.x, guy.y - gh / 2 - 22, 12, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
