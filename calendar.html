@@ -214,6 +214,7 @@
         <input type="text" id="patName2" value="Dad" maxlength="12">
         <div class="colorrow" id="patColorRow2"></div>
       </div>
+      <button class="cbtn close" id="patSwapBtn" style="margin-bottom:8px;">🔄 Swap who's first (fix today)</button>
       <label>🔢 Days pattern (like 5,5,2,2):</label>
       <input type="text" id="patCounts" value="5,5,2,2">
       <p style="font-size:0.82rem; margin:2px 0 8px;">It goes <b id="patName1Echo">Mom</b>, <b id="patName2Echo">Dad</b>, <b id="patName1Echo2">Mom</b>, <b id="patName2Echo2">Dad</b>… using those day counts, then repeats forever!</p>
@@ -663,6 +664,15 @@
       render();
     }
     document.getElementById("patBtn").addEventListener("click", openPattern);
+    // Swap the two people (flips whose day today is)
+    document.getElementById("patSwapBtn").addEventListener("click", function () {
+      var n1 = document.getElementById("patName1"), n2 = document.getElementById("patName2");
+      var tmpName = n1.value; n1.value = n2.value; n2.value = tmpName;
+      var tmpColor = patColor1; patColor1 = patColor2; patColor2 = tmpColor;
+      buildPatColorRow("patColorRow1", function () { return patColor1; }, function (c) { patColor1 = c; });
+      buildPatColorRow("patColorRow2", function () { return patColor2; }, function (c) { patColor2 = c; });
+      updatePatEcho();
+    });
     document.getElementById("patName1").addEventListener("input", updatePatEcho);
     document.getElementById("patName2").addEventListener("input", updatePatEcho);
     document.getElementById("patSaveBtn").addEventListener("click", savePattern2);
