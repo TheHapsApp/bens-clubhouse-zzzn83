@@ -233,6 +233,11 @@
       <p style="font-size:0.9rem; margin-bottom:6px;">Fills the calendar with a repeating schedule that goes back and forth between two places.</p>
       <label>📅 Starts on this day:</label>
       <input type="date" id="patStart">
+      <p style="font-size:0.82rem; margin:2px 0 4px;">Off by a day? Nudge the whole schedule:</p>
+      <div class="row" style="margin-bottom:8px;">
+        <button class="cbtn close" id="patShiftBack">◀ Move 1 day back</button>
+        <button class="cbtn close" id="patShiftFwd">Move 1 day forward ▶</button>
+      </div>
       <div class="patrow">
         <input type="text" id="patName1" value="Mom" maxlength="12">
         <div class="colorrow" id="patColorRow1"></div>
@@ -691,6 +696,15 @@
       render();
     }
     document.getElementById("patBtn").addEventListener("click", openPattern);
+    // Nudge the whole schedule one day earlier/later (fixes an "off by a day")
+    function shiftStart(delta) {
+      var v = document.getElementById("patStart").value;
+      var d = v ? keyToDate(v) : new Date(today.getTime());
+      d.setDate(d.getDate() + delta);
+      document.getElementById("patStart").value = toISO(d);
+    }
+    document.getElementById("patShiftBack").addEventListener("click", function () { shiftStart(-1); });
+    document.getElementById("patShiftFwd").addEventListener("click", function () { shiftStart(1); });
     // Swap the two people (flips whose day today is)
     document.getElementById("patSwapBtn").addEventListener("click", function () {
       var n1 = document.getElementById("patName1"), n2 = document.getElementById("patName2");
