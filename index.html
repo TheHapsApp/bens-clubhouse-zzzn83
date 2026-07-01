@@ -203,6 +203,12 @@
       padding: 24px;
     }
     .screen.show { display: flex; }
+    /* The title screen is a solid RAINBOW — hides the word bubbles behind it */
+    #title {
+      background: linear-gradient(120deg, #ff5fa2, #ffd23f, #3fd0ff, #8a5cff);
+      background-size: 400% 400%;
+      animation: flow 12s ease infinite;
+    }
     .screen-title {
       font-size: clamp(2.2rem, 9vw, 4.5rem);
       color: #ffd23f;
