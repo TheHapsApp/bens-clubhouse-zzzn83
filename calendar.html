@@ -95,14 +95,28 @@
     .day .rangebar.end   { right: 3px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
     /* while you're dragging to pick a range */
     .day.selecting { background: #ffe08a; box-shadow: 0 0 0 3px #ff8f3f inset; }
+    /* repeating pattern (Mom's house / Dad's house) label band at the top */
+    .day.hashouse { padding-top: 19px; }
+    .houseband {
+      position: absolute; top: 0; left: 0; right: 0; height: 16px;
+      font-size: 0.55rem; line-height: 16px; color: #fff; font-weight: bold; text-align: center;
+      border-top-left-radius: 12px; border-top-right-radius: 12px;
+      overflow: hidden; white-space: nowrap;
+    }
+    .patrow { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .patrow input[type=text] { flex: 1; margin: 0; }
+    .patrow .colorrow { margin: 0; }
+    #patModal .card { max-width: 420px; }
+    #patModal label { display: block; text-align: left; font-size: 0.9rem; margin-top: 6px; }
+    #patStart, #patCounts { margin-bottom: 6px; }
 
     /* Add-event popup */
-    #modal, #rangeModal {
+    #modal, #rangeModal, #patModal {
       position: fixed; inset: 0; z-index: 20; display: none;
       align-items: center; justify-content: center;
       background: rgba(30, 8, 60, 0.75); padding: 20px;
     }
-    #modal.show, #rangeModal.show { display: flex; }
+    #modal.show, #rangeModal.show, #patModal.show { display: flex; }
     .card {
       background: #fff; color: #4a2b8c; border-radius: 22px; padding: 20px;
       width: 100%; max-width: 380px; text-align: center;
@@ -110,7 +124,7 @@
     .card h2 { font-size: 1.4rem; margin-bottom: 10px; }
     /* Let you actually TYPE in the boxes (the page blocks selecting everywhere else) */
     input, #eventInput, #rangeInput { -webkit-user-select: text; user-select: text; }
-    #eventInput, #rangeInput {
+    #eventInput, #rangeInput, #patStart, #patCounts, .patrow input[type=text] {
       font-family: inherit; font-size: 1.1rem; width: 100%;
       padding: 12px; border: 3px solid #8a5cff; border-radius: 14px; margin-bottom: 10px;
     }
@@ -144,6 +158,7 @@
     <button class="navbtn" id="next">▶</button>
   </div>
   <button class="todaybtn" id="todayBtn">⭐ Go to Today</button>
+  <button class="todaybtn" id="patBtn" style="background:#c98aff; color:#fff;">🔁 Repeating Pattern</button>
 
   <div class="cal">
     <div class="weekdays">
@@ -180,6 +195,32 @@
     </div>
   </div>
 
+  <!-- Repeating pattern setup (like Mom's house / Dad's house) -->
+  <div id="patModal">
+    <div class="card">
+      <h2>🔁 Repeating Pattern</h2>
+      <p style="font-size:0.9rem; margin-bottom:6px;">Fills the calendar with a repeating schedule that goes back and forth between two places.</p>
+      <label>📅 Starts on this day:</label>
+      <input type="date" id="patStart">
+      <div class="patrow">
+        <input type="text" id="patName1" value="Mom" maxlength="12">
+        <div class="colorrow" id="patColorRow1"></div>
+      </div>
+      <div class="patrow">
+        <input type="text" id="patName2" value="Dad" maxlength="12">
+        <div class="colorrow" id="patColorRow2"></div>
+      </div>
+      <label>🔢 Days pattern (like 5,5,2,2):</label>
+      <input type="text" id="patCounts" value="5,5,2,2">
+      <p style="font-size:0.82rem; margin:2px 0 8px;">It goes <b id="patName1Echo">Mom</b>, <b id="patName2Echo">Dad</b>, <b id="patName1Echo2">Mom</b>, <b id="patName2Echo2">Dad</b>… using those day counts, then repeats forever!</p>
+      <div class="row">
+        <button class="cbtn add" id="patSaveBtn">✅ Save Pattern</button>
+        <button class="cbtn close" id="patOffBtn">🚫 Turn Off</button>
+        <button class="cbtn close" id="patCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     var MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
@@ -208,6 +249,32 @@
     var selectedRangeColor = RANGE_COLORS[0]; // the color you picked for a new line
     function keyToDate(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
     function sameDay(a, b) { return a.getTime() === b.getTime(); }
+    function toISO(d) {
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+
+    // ---- Repeating pattern (Mom's house / Dad's house schedule) ----
+    function loadPattern() { try { return JSON.parse(localStorage.getItem("calendar_pattern") || "null"); } catch (e) { return null; } }
+    function savePattern() {
+      try { pattern ? localStorage.setItem("calendar_pattern", JSON.stringify(pattern)) : localStorage.removeItem("calendar_pattern"); } catch (e) {}
+    }
+    var pattern = loadPattern();
+    // Which place is this day? Returns { name, color } or null.
+    function houseFor(cellDate) {
+      if (!pattern || !pattern.counts || !pattern.counts.length) return null;
+      var cyc = pattern.counts.reduce(function (a, b) { return a + b; }, 0);
+      if (cyc <= 0) return null;
+      var start = keyToDate(pattern.start);
+      var dayIndex = Math.round((cellDate - start) / 86400000);
+      var pos = ((dayIndex % cyc) + cyc) % cyc; // works forward AND backward
+      var acc = 0, seg = 0;
+      for (var i = 0; i < pattern.counts.length; i++) {
+        if (pos < acc + pattern.counts[i]) { seg = i; break; }
+        acc += pattern.counts[i];
+      }
+      var isFirst = (seg % 2 === 0); // even segment = place 1, odd = place 2
+      return { name: isFirst ? pattern.name1 : pattern.name2, color: isFirst ? pattern.color1 : pattern.color2 };
+    }
 
     // ---- Holidays! (built in — shown automatically on their dates) ----
     var holidayCache = {};
@@ -289,6 +356,16 @@
         cell.dataset.day = d;
         var isToday = (viewYear === today.getFullYear() && viewMonth === today.getMonth() && d === today.getDate());
         if (isToday) cell.className += " today";
+
+        // repeating-pattern label band (Mom's / Dad's house)
+        var cellDateP = new Date(viewYear, viewMonth, d);
+        var house = houseFor(cellDateP);
+        if (house) {
+          cell.classList.add("hashouse");
+          var band = document.createElement("div"); band.className = "houseband";
+          band.textContent = house.name; band.style.background = house.color;
+          cell.appendChild(band);
+        }
 
         var num = document.createElement("div"); num.className = "num"; num.textContent = d;
         cell.appendChild(num);
@@ -504,6 +581,77 @@
     });
     document.getElementById("rangeModal").addEventListener("click", function (e) {
       if (e.target === this) { this.classList.remove("show"); pendingRange = null; }
+    });
+
+    // ---- Repeating pattern setup popup ----
+    var patColor1 = "#ff5fa2", patColor2 = "#2a6bff";
+    function buildPatColorRow(rowId, current, onPick) {
+      var row = document.getElementById(rowId);
+      row.innerHTML = "";
+      RANGE_COLORS.forEach(function (c) {
+        var sw = document.createElement("div");
+        sw.className = "swatch" + (c === current() ? " sel" : "");
+        sw.style.background = c;
+        sw.addEventListener("click", function () {
+          onPick(c);
+          var all = row.querySelectorAll(".swatch");
+          for (var i = 0; i < all.length; i++) all[i].classList.remove("sel");
+          sw.classList.add("sel");
+        });
+        row.appendChild(sw);
+      });
+    }
+    function updatePatEcho() {
+      var n1 = document.getElementById("patName1").value.trim() || "Place 1";
+      var n2 = document.getElementById("patName2").value.trim() || "Place 2";
+      document.getElementById("patName1Echo").textContent = n1;
+      document.getElementById("patName2Echo").textContent = n2;
+      document.getElementById("patName1Echo2").textContent = n1;
+      document.getElementById("patName2Echo2").textContent = n2;
+    }
+    function openPattern() {
+      // fill in whatever is saved, or nice defaults
+      document.getElementById("patStart").value = (pattern && pattern.start) ? pattern.start : toISO(today);
+      document.getElementById("patName1").value = (pattern && pattern.name1) || "Mom";
+      document.getElementById("patName2").value = (pattern && pattern.name2) || "Dad";
+      document.getElementById("patCounts").value = (pattern && pattern.counts) ? pattern.counts.join(",") : "5,5,2,2";
+      patColor1 = (pattern && pattern.color1) || "#ff5fa2";
+      patColor2 = (pattern && pattern.color2) || "#2a6bff";
+      buildPatColorRow("patColorRow1", function () { return patColor1; }, function (c) { patColor1 = c; });
+      buildPatColorRow("patColorRow2", function () { return patColor2; }, function (c) { patColor2 = c; });
+      updatePatEcho();
+      document.getElementById("patModal").classList.add("show");
+    }
+    function savePattern2() {
+      var counts = document.getElementById("patCounts").value.split(",")
+        .map(function (n) { return parseInt(n, 10); })
+        .filter(function (n) { return n > 0; });
+      if (!counts.length) counts = [5, 5, 2, 2];
+      pattern = {
+        start: document.getElementById("patStart").value || toISO(today),
+        name1: document.getElementById("patName1").value.trim() || "Mom",
+        name2: document.getElementById("patName2").value.trim() || "Dad",
+        color1: patColor1, color2: patColor2,
+        counts: counts
+      };
+      savePattern();
+      document.getElementById("patModal").classList.remove("show");
+      render();
+    }
+    document.getElementById("patBtn").addEventListener("click", openPattern);
+    document.getElementById("patName1").addEventListener("input", updatePatEcho);
+    document.getElementById("patName2").addEventListener("input", updatePatEcho);
+    document.getElementById("patSaveBtn").addEventListener("click", savePattern2);
+    document.getElementById("patOffBtn").addEventListener("click", function () {
+      pattern = null; savePattern();
+      document.getElementById("patModal").classList.remove("show");
+      render();
+    });
+    document.getElementById("patCancelBtn").addEventListener("click", function () {
+      document.getElementById("patModal").classList.remove("show");
+    });
+    document.getElementById("patModal").addEventListener("click", function (e) {
+      if (e.target === this) this.classList.remove("show");
     });
 
     render();
