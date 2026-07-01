@@ -289,6 +289,12 @@
       padding: 8px 10px;
     }
     .fave-label { flex: 1; text-align: left; font-size: 1rem; }
+    #favesCount {
+      background: rgba(255,255,255,0.2);
+      border: 3px solid #fff;
+      border-radius: 16px;
+      padding: 8px 18px;
+    }
     .fave-row .smallbtn { padding: 8px 12px; font-size: 0.95rem; }
 
     /* Game Over screen */
@@ -470,6 +476,7 @@
   <!-- Your Favorite Videos gallery -->
   <div id="faves" class="screen">
     <div class="screen-title">⭐ Your Favorite Videos</div>
+    <div id="favesCount" class="lb-title">📼 0 videos saved</div>
     <video id="faveVideo" playsinline loop controls style="display:none"></video>
     <div id="favesList" class="faves-list"></div>
     <button id="favesBack" class="smallbtn">⬅ Back</button>
@@ -706,8 +713,12 @@
     // Build the list of saved videos
     function renderFaves() {
       var listEl = document.getElementById("favesList");
+      var countEl = document.getElementById("favesCount");
       listEl.innerHTML = "<p class='hint'>Loading your videos… ⏳</p>";
+      countEl.textContent = "📼 counting…";
       listFavorites().then(function (items) {
+        // show how many videos are saved
+        countEl.textContent = "📼 " + items.length + (items.length === 1 ? " video saved" : " videos saved");
         if (!items.length) {
           listEl.innerHTML = "<p class='hint'>No favorite videos yet! Play a game, then tap 💾 Save to Favorites. ⭐</p>";
           return;
@@ -732,6 +743,7 @@
           listEl.appendChild(row);
         });
       }).catch(function () {
+        document.getElementById("favesCount").textContent = "📼 — videos saved";
         listEl.innerHTML = "<p class='hint'>This browser can't keep saved videos. 😕</p>";
       });
     }
