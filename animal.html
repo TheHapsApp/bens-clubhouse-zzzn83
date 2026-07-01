@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Pick Your Favorite Animal!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    body {
+      font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+      min-height: 100vh;
+      color: #fff;
+      text-align: center;
+      background: linear-gradient(120deg, #6a5cff, #ff5fa2, #3fd0ff, #ffd23f);
+      background-size: 400% 400%;
+      animation: flow 14s ease infinite;
+      padding: 22px 14px 60px;
+      overflow-x: hidden;
+    }
+    @keyframes flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    h1 {
+      font-size: clamp(1.8rem, 7vw, 3.4rem);
+      text-shadow: 3px 3px 0 rgba(0,0,0,0.25);
+      animation: pop 2.6s ease-in-out infinite;
+    }
+    @keyframes pop {
+      0%, 100% { transform: scale(1) rotate(-1deg); }
+      50%      { transform: scale(1.04) rotate(1deg); }
+    }
+    .sub { font-size: clamp(1rem, 3.6vw, 1.3rem); margin: 8px 0 16px; }
+
+    .menu {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+      gap: 12px;
+      max-width: 640px;
+      margin: 0 auto 18px;
+    }
+    .animal {
+      background: rgba(255,255,255,0.22);
+      border: 4px solid #fff;
+      border-radius: 22px;
+      padding: 14px 6px;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+    .animal:hover { transform: translateY(-5px) scale(1.05); background: rgba(255,255,255,0.34); }
+    .animal:active { transform: scale(0.95); }
+    .animal .emo { font-size: 2.8rem; display: block; }
+    .animal .nm { font-size: 0.95rem; font-weight: bold; margin-top: 4px; }
+
+    /* The big picked-animal stage */
+    #stage {
+      margin: 10px auto 0;
+      max-width: 460px;
+      background: rgba(255,255,255,0.18);
+      border: 5px dashed #fff;
+      border-radius: 28px;
+      padding: 22px 16px;
+      min-height: 150px;
+    }
+    #bigAnimal { font-size: clamp(4rem, 24vw, 8rem); line-height: 1; }
+    #bigAnimal.bounce { animation: bounce 0.7s ease; }
+    @keyframes bounce {
+      0%   { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+      55%  { transform: scale(1.25) rotate(8deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    #pickText { font-size: clamp(1.2rem, 5vw, 1.9rem); margin-top: 10px; text-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
+
+    .btn {
+      font-family: inherit; font-weight: bold; font-size: clamp(1rem, 4vw, 1.4rem);
+      color: #6a2cff; background: #fff; border: 4px solid #fff; border-radius: 22px;
+      padding: 12px 24px; margin: 16px 6px 0; cursor: pointer; box-shadow: 0 5px 0 rgba(0,0,0,0.22);
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.22); }
+
+    /* Falling stars */
+    .star {
+      position: fixed;
+      top: -40px;
+      font-size: 1.8rem;
+      z-index: 9;
+      pointer-events: none;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      to { transform: translateY(110vh) rotate(540deg); opacity: 0.85; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🌟 Pick Your Favorite Animal! 🐾</h1>
+  <p class="sub">Tap an animal — music plays and stars rain down! ✨</p>
+
+  <div class="menu" id="menu"></div>
+
+  <div id="stage">
+    <div id="bigAnimal">❓</div>
+    <div id="pickText">Which one is YOUR favorite?</div>
+  </div>
+
+  <button class="btn" id="musicBtn">🎵 Music: On</button>
+  <button class="btn" id="starBtn">🌟 More Stars!</button>
+
+  <script>
+    var ANIMALS = [
+      { e: "🐶", n: "Dog" }, { e: "🐱", n: "Cat" }, { e: "🦁", n: "Lion" },
+      { e: "🐯", n: "Tiger" }, { e: "🦄", n: "Unicorn" }, { e: "🐼", n: "Panda" },
+      { e: "🦊", n: "Fox" }, { e: "🐬", n: "Dolphin" }, { e: "🐧", n: "Penguin" },
+      { e: "🐢", n: "Turtle" }, { e: "🦉", n: "Owl" }, { e: "🐴", n: "Horse" },
+      { e: "🐘", n: "Elephant" }, { e: "🦈", n: "Shark" }, { e: "🐸", n: "Frog" },
+      { e: "🦋", n: "Butterfly" }
+    ];
+
+    // Build the animal buttons
+    var menu = document.getElementById("menu");
+    ANIMALS.forEach(function (a) {
+      var b = document.createElement("button");
+      b.className = "animal";
+      b.innerHTML = '<span class="emo">' + a.e + '</span><span class="nm">' + a.n + '</span>';
+      b.addEventListener("click", function () { pickAnimal(a); });
+      menu.appendChild(b);
+    });
+
+    function pickAnimal(a) {
+      var big = document.getElementById("bigAnimal");
+      big.textContent = a.e;
+      big.classList.remove("bounce");
+      void big.offsetWidth; // restart the bounce animation
+      big.classList.add("bounce");
+      document.getElementById("pickText").textContent = "Yay! You love the " + a.n + "! " + a.e;
+      starBurst(40);        // a big shower of stars!
+      ensureMusic();        // make sure the happy music is playing
+      playSparkle();        // a little twinkle sound
+    }
+
+    /* ---------- Falling stars ---------- */
+    var STAR_EMOJIS = ["⭐", "🌟", "✨", "💫"];
+    function makeStar() {
+      var s = document.createElement("div");
+      s.className = "star";
+      s.textContent = STAR_EMOJIS[Math.floor(Math.random() * STAR_EMOJIS.length)];
+      s.style.left = Math.random() * 100 + "vw";
+      s.style.fontSize = (1.2 + Math.random() * 1.8) + "rem";
+      var dur = 2.4 + Math.random() * 2.6;
+      s.style.animationDuration = dur + "s";
+      document.body.appendChild(s);
+      setTimeout(function () { s.remove(); }, dur * 1000 + 200);
+    }
+    function starBurst(n) { for (var i = 0; i < n; i++) setTimeout(makeStar, i * 30); }
+    // a gentle sprinkle of stars the whole time
+    setInterval(function () { makeStar(); }, 700);
+
+    /* ---------- Happy music (made by the browser) ---------- */
+    var audioCtx = null, musicOn = true, musicTimer = null, musicStep = 0;
+    // a cheerful looping tune (note pitches in Hz; 0 = a little rest)
+    var MELODY = [523, 659, 784, 659, 523, 587, 659, 587,
+                  494, 587, 698, 587, 494, 523, 587, 0,
+                  659, 784, 880, 784, 659, 698, 784, 698,
+                  587, 659, 784, 880, 988, 880, 784, 0];
+    var BASS = [131, 131, 196, 196, 165, 165, 196, 196];
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { audioCtx = null; }
+      }
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+    function beep(freq, start, dur, type, vol) {
+      var ac = audioCtx; if (!ac || !freq) return;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, start);
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.linearRampToValueAtTime(vol, start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(start); o.stop(start + dur + 0.02);
+    }
+    function scheduleMusic() {
+      if (!musicOn) return;
+      var ac = ensureAudio(); if (!ac) return;
+      var step = 0.22, t = ac.currentTime + 0.05;
+      for (var i = 0; i < 8; i++) {
+        var note = MELODY[(musicStep + i) % MELODY.length];
+        beep(note, t + i * step, step * 0.9, "square", 0.06);          // the tune
+        beep(BASS[i % BASS.length], t + i * step, step * 0.9, "triangle", 0.08); // the bassline
+      }
+      musicStep = (musicStep + 8) % MELODY.length;
+      musicTimer = setTimeout(scheduleMusic, 8 * step * 1000);
+    }
+    function ensureMusic() { if (musicOn && !musicTimer) scheduleMusic(); }
+    function startMusic() { musicOn = true; document.getElementById("musicBtn").textContent = "🎵 Music: On"; scheduleMusic(); }
+    function stopMusic() { musicOn = false; document.getElementById("musicBtn").textContent = "🎵 Music: Off"; if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; } }
+    function playSparkle() {
+      var ac = ensureAudio(); if (!ac) return;
+      var seq = [784, 988, 1319], t = ac.currentTime + 0.02;
+      seq.forEach(function (f) { beep(f, t, 0.12, "triangle", 0.12); t += 0.07; });
+    }
+
+    document.getElementById("musicBtn").addEventListener("click", function () {
+      ensureAudio();
+      if (musicOn) stopMusic(); else startMusic();
+    });
+    document.getElementById("starBtn").addEventListener("click", function () { starBurst(30); ensureMusic(); });
+
+    // Browsers only allow sound after a tap — start the music on the very first tap
+    window.addEventListener("pointerdown", function starter() {
+      ensureAudio(); ensureMusic();
+      window.removeEventListener("pointerdown", starter);
+    });
+  </script>
+</body>
+</html>
