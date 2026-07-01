@@ -1127,7 +1127,7 @@
           y: 20 + Math.random() * (H - 40),
           vx: 0, vy: 0,
           born: Date.now(),
-          shootTimer: 5 + Math.floor(Math.random() * 30)
+          shootTimer: 40 + Math.floor(Math.random() * 80)
         });
       }
     }
@@ -2267,17 +2267,8 @@
         ctx.fillStyle = "#5fff8f"; ctx.fillRect(mboss.x - bw / 2, mboss.y - 86, bw * bp, 12);
         ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(mboss.x - bw / 2, mboss.y - 86, bw, 12);
       }
-      // Armor auto-fire: the oversized gun blasts big bullets by itself!
-      if (armorMode && !dying) {
-        autoFireTimer--;
-        if (autoFireTimer <= 0) {
-          var adir = flipped ? 1 : -1;
-          bullets.push({ x: guy.x, y: guy.y + adir * (guy.h / 2 + 8), speed: 11, dir: adir,
-                         r: 16, big: false, color: "#bfc4cc", points: 1 });
-          makeSparkles(guy.x, guy.y + adir * (guy.h / 2 + 8), "#bfc4cc", 4);
-          autoFireTimer = 11; // fires a bit slower now = a little less damage
-        }
-      }
+      // (The armor gun does NOT shoot by itself anymore — YOU shoot it during
+      //  the boss fight! Press S or tap the Shoot button to blast the boss.)
 
       // ---- Rainbow ball: spawn, move, draw ----
       if (!gameOver && !rainbowBall && !rainbowMode) {
@@ -2824,7 +2815,7 @@
           var sang = Math.atan2(cltarget.y - cln.y, (cltarget.drawX || cltarget.x) - cln.x);
           bullets.push({ x: cln.x, y: cln.y, r: 5, big: false, color: "#3fd0ff", points: 1,
                          vx: Math.cos(sang) * 9, vy: Math.sin(sang) * 9 });
-          cln.shootTimer = 22;
+          cln.shootTimer = 80 + Math.floor(Math.random() * 50); // shoot MUCH less so you get to shoot too
         }
         // draw the clone (a small cyan triangle copy of you)
         ctx.fillStyle = "#3fd0ff";
