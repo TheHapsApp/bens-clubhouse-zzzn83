@@ -66,8 +66,14 @@
     .day:hover { transform: scale(1.05); }
     .day.blank { background: transparent; cursor: default; }
     .day.blank:hover { transform: none; }
-    .day.today { background: #ffd23f; color: #a04; box-shadow: 0 0 0 3px #fff inset; }
+    /* TODAY gets a blue ring around the whole square + a blue dot on the number */
+    .day.today { background: rgba(42,107,255,0.14); box-shadow: 0 0 0 4px #2a6bff inset; }
     .day .num { font-size: clamp(0.9rem, 3vw, 1.2rem); }
+    .day.today .num {
+      background: #2a6bff; color: #fff;
+      width: 1.9em; height: 1.9em; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
     .day .dots { margin-top: 3px; font-size: 0.6rem; line-height: 1; color: #ff2a2a; }
     .day .mini {
       font-size: 0.55rem; color: #2a6bff; line-height: 1.1;
