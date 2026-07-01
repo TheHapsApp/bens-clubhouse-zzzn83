@@ -79,6 +79,10 @@
       font-size: 0.5rem; color: #d1006c; font-weight: bold; line-height: 1.1;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;
     }
+    .day .bday {
+      font-size: 0.52rem; color: #d1006c; font-weight: bold; line-height: 1.05;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px;
+    }
     .day .dots { margin-top: 3px; font-size: 0.6rem; line-height: 1; color: #ff2a2a; }
     .day .mini {
       font-size: 0.55rem; color: #2a6bff; line-height: 1.1;
@@ -343,6 +347,18 @@
       var numDays = new Date(viewYear, viewMonth + 1, 0).getDate();
       var holis = getHolidays(viewYear); // holidays for this year
 
+      // Find every event with the word "birthday" — those repeat EVERY year!
+      var bdayMap = {}; // "month-day" -> [{ text, year }]
+      for (var ek in events) {
+        var ep = ek.split("-"); // [year, month(1-based), day]
+        (events[ek] || []).forEach(function (t) {
+          if (/birthday/i.test(t)) {
+            var mk = ep[1] + "-" + ep[2];
+            (bdayMap[mk] = bdayMap[mk] || []).push({ text: t, year: +ep[0] });
+          }
+        });
+      }
+
       // blank cells before the 1st
       for (var b = 0; b < firstDay; b++) {
         var blank = document.createElement("div");
@@ -376,6 +392,14 @@
           var hd = document.createElement("div"); hd.className = "holi"; hd.textContent = holis[k];
           cell.appendChild(hd);
         }
+        // repeating birthdays from OTHER years (same month + day)
+        var mk = (viewMonth + 1) + "-" + d;
+        (bdayMap[mk] || []).forEach(function (bd) {
+          if (bd.year !== viewYear) { // this-year ones already show as a normal event below
+            var be = document.createElement("div"); be.className = "bday"; be.textContent = "🎂 " + bd.text;
+            cell.appendChild(be);
+          }
+        });
         var list = events[k] || [];
         if (list.length) {
           var mini = document.createElement("div"); mini.className = "mini"; mini.textContent = list[0];
