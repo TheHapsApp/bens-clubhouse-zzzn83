@@ -550,10 +550,16 @@
       try {
         var chunks = []; // this game's video pieces (kept private to this recorder)
         var stream = canvas.captureStream(30); // 30 pictures per second of the game
-        // Add the game's SOUND to the recording too!
+        // Add the game's SOUND to the recording too — make a FRESH sound track
+        // right now so it starts at the same moment as the picture (keeps them in sync).
         ensureAudio();
-        if (recDest && recDest.stream) {
-          recDest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+        if (audioCtx && masterGain) {
+          try {
+            if (recDest) { try { masterGain.disconnect(recDest); } catch (e2) {} }
+            recDest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(recDest);
+            recDest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+          } catch (e) { recDest = null; }
         }
         var mime = pickRecMime();
         var opts = mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : undefined;
@@ -584,6 +590,9 @@
         try { mediaRecorder.stop(); } catch (e) {}
       }
       mediaRecorder = null;
+      // unhook the recording's sound track so the next game makes a fresh one
+      if (masterGain && recDest) { try { masterGain.disconnect(recDest); } catch (e) {} }
+      recDest = null;
     }
 
     function playCoolReel() {
@@ -750,13 +759,12 @@
         try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
         catch (e) { audioCtx = null; }
         if (audioCtx) {
-          // master volume node → goes to the speakers
+          // master volume node → goes to the speakers.
+          // (The video's sound track is hooked up later, right when recording
+          //  starts, so the sound and picture line up.)
           masterGain = audioCtx.createGain();
           masterGain.gain.value = 1;
           masterGain.connect(audioCtx.destination);
-          // ...and ALSO into a stream we can record into the video
-          try { recDest = audioCtx.createMediaStreamDestination(); masterGain.connect(recDest); }
-          catch (e) { recDest = null; }
         }
       }
       if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
