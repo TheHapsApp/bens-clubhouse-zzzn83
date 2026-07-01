@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>My Calendar</title>
+  <title>Ben's Calendar</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
     body {
@@ -26,10 +26,10 @@
 
     /* Month bar */
     .bar {
-      display: flex; align-items: center; justify-content: center; gap: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
       margin: 16px auto 10px; max-width: 760px;
     }
-    #monthLabel { font-size: clamp(1.2rem, 5vw, 2rem); min-width: 220px; text-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
+    #monthLabel { font-size: clamp(1.2rem, 5vw, 2rem); min-width: 160px; text-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
     .navbtn {
       font-family: inherit; font-weight: bold; font-size: 1.6rem;
       color: #6a2cff; background: #fff; border: 3px solid #fff; border-radius: 16px;
@@ -151,10 +151,37 @@
       background: #f2ecff; border-radius: 10px; padding: 8px 10px; margin: 5px 0; font-size: 1rem;
     }
     #eventList .del { background: #ffdada; color: #a04; border: none; border-radius: 8px; padding: 4px 8px; cursor: pointer; font-weight: bold; }
+
+    /* ===== PHONE-FRIENDLY: make everything fit + easy to tap on small screens ===== */
+    @media (max-width: 560px) {
+      body { padding: 14px 6px 40px; }
+      h1 { font-size: 1.7rem; }
+      .bar { gap: 8px; margin: 12px auto 8px; }
+      .navbtn { width: 46px; height: 46px; font-size: 1.3rem; }
+      #monthLabel { min-width: 130px; }
+      .cal { padding: 7px; border-width: 4px; border-radius: 18px; }
+      .weekdays, .days { gap: 3px; }
+      .weekdays div { padding: 3px 0; }
+      .day { min-height: 52px; padding: 4px 2px 14px; border-radius: 9px; }
+      .day .num { font-size: 0.95rem; }
+      .day.hashouse { padding-top: 17px; }
+      .houseband { height: 14px; line-height: 14px; font-size: 0.5rem; }
+      .day .holi, .day .bday, .day .mini { font-size: 0.46rem; }
+      .day .rangebar { height: 13px; line-height: 13px; }
+      .card { padding: 16px; }
+      .swatch { width: 30px; height: 30px; }
+    }
+    /* even tinier phones */
+    @media (max-width: 380px) {
+      .day { min-height: 46px; }
+      .day .num { font-size: 0.85rem; }
+      .navbtn { width: 42px; height: 42px; }
+      .todaybtn { font-size: 0.85rem; padding: 8px 12px; }
+    }
   </style>
 </head>
 <body>
-  <h1>📅 My Calendar</h1>
+  <h1>📅 Ben's Calendar</h1>
 
   <div class="bar">
     <button class="navbtn" id="prev">◀</button>
