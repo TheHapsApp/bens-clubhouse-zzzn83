@@ -1156,6 +1156,7 @@
     function triggerGameOver() {
       gameOver = true;
       lastGameScore = score;     // remember this game's score for the saved video
+      stopMusic();               // the music turns off when you die
       stopRecording();           // finish the video of this game
       document.getElementById("finalScore").textContent = score;
       saveScore(score);          // remember this score
@@ -1811,6 +1812,9 @@
         requestAnimationFrame(loop);
         return;
       }
+
+      // When you DIE, EVERYTHING freezes — you can't move your guy or do anything.
+      if (gameOver) { requestAnimationFrame(loop); return; }
 
       // The PRIZE WHEEL is spinning — freeze the game and draw it
       if (wheelActive) {
