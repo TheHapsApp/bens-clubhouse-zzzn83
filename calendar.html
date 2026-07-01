@@ -57,11 +57,12 @@
       color: #4a2b8c;
       border-radius: 12px;
       min-height: 62px;
-      padding: 6px 4px;
+      padding: 6px 4px 16px;
       cursor: pointer;
       font-weight: bold;
       display: flex; flex-direction: column; align-items: center;
       transition: transform 0.1s ease;
+      touch-action: none; /* let you DRAG across days without the page scrolling */
     }
     .day:hover { transform: scale(1.05); }
     .day.blank { background: transparent; cursor: default; }
@@ -79,20 +80,33 @@
       font-size: 0.55rem; color: #2a6bff; line-height: 1.1;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* the "huge line" bar for a multi-day event (vacations, trips…) */
+    .day .rangebar {
+      position: absolute; left: -4px; right: -4px; bottom: 3px;
+      height: 15px; background: #ff5fa2; color: #fff;
+      font-size: 0.55rem; line-height: 15px; white-space: nowrap;
+      overflow: hidden; text-align: center;
+    }
+    .day .rangebar.start { left: 3px; border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+    .day .rangebar.end   { right: 3px; border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+    /* while you're dragging to pick a range */
+    .day.selecting { background: #ffe08a; box-shadow: 0 0 0 3px #ff8f3f inset; }
 
     /* Add-event popup */
-    #modal {
+    #modal, #rangeModal {
       position: fixed; inset: 0; z-index: 20; display: none;
       align-items: center; justify-content: center;
       background: rgba(30, 8, 60, 0.75); padding: 20px;
     }
-    #modal.show { display: flex; }
+    #modal.show, #rangeModal.show { display: flex; }
     .card {
       background: #fff; color: #4a2b8c; border-radius: 22px; padding: 20px;
       width: 100%; max-width: 380px; text-align: center;
     }
     .card h2 { font-size: 1.4rem; margin-bottom: 10px; }
-    #eventInput {
+    /* Let you actually TYPE in the boxes (the page blocks selecting everywhere else) */
+    input, #eventInput, #rangeInput { -webkit-user-select: text; user-select: text; }
+    #eventInput, #rangeInput {
       font-family: inherit; font-size: 1.1rem; width: 100%;
       padding: 12px; border: 3px solid #8a5cff; border-radius: 14px; margin-bottom: 10px;
     }
@@ -141,6 +155,19 @@
     </div>
   </div>
 
+  <!-- Name-your-multi-day-event popup -->
+  <div id="rangeModal">
+    <div class="card">
+      <h2 id="rangeTitle">New trip!</h2>
+      <p style="margin-bottom:8px; font-size:0.95rem;">🏖️ What are these days for? (like "Vacation!")</p>
+      <input id="rangeInput" type="text" placeholder="Name your days… 🎉" maxlength="40">
+      <div class="row">
+        <button class="cbtn add" id="rangeAddBtn">➕ Add these days</button>
+        <button class="cbtn close" id="rangeCloseBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     var MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
@@ -161,10 +188,20 @@
     var events = loadEvents();
     function keyFor(y, m, d) { return y + "-" + (m + 1) + "-" + d; }
 
+    // ---- Multi-day events (drag across days, like a vacation!) ----
+    function loadRanges() { try { return JSON.parse(localStorage.getItem("calendar_ranges") || "[]"); } catch (e) { return []; } }
+    function saveRanges() { try { localStorage.setItem("calendar_ranges", JSON.stringify(ranges)); } catch (e) {} }
+    var ranges = loadRanges();
+    var RANGE_COLORS = ["#ff5fa2", "#3fd0ff", "#5fff8f", "#ffd23f", "#ff8f3f", "#c98aff"];
+    function keyToDate(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    function sameDay(a, b) { return a.getTime() === b.getTime(); }
+
+    var dayCells = {}; // dayNumber -> cell element (used while dragging)
     function render() {
       document.getElementById("monthLabel").textContent = MONTHS[viewMonth] + " " + viewYear;
       var daysEl = document.getElementById("days");
       daysEl.innerHTML = "";
+      dayCells = {};
 
       var firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
       var numDays = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -179,6 +216,7 @@
       for (var d = 1; d <= numDays; d++) {
         var cell = document.createElement("div");
         cell.className = "day";
+        cell.dataset.day = d;
         var isToday = (viewYear === today.getFullYear() && viewMonth === today.getMonth() && d === today.getDate());
         if (isToday) cell.className += " today";
 
@@ -197,8 +235,28 @@
           }
         }
 
+        // draw a bar for every multi-day event covering this day
+        var cellDate = new Date(viewYear, viewMonth, d);
+        var weekday = cellDate.getDay();
+        var barIndex = 0;
+        ranges.forEach(function (rg) {
+          var s = keyToDate(rg.start), e = keyToDate(rg.end);
+          if (cellDate >= s && cellDate <= e) {
+            var bar = document.createElement("div");
+            bar.className = "rangebar";
+            if (sameDay(cellDate, s) || weekday === 0) bar.className += " start"; // rounded at the start / week start
+            if (sameDay(cellDate, e) || weekday === 6) bar.className += " end";   // rounded at the end / week end
+            bar.style.background = rg.color || "#ff5fa2";
+            bar.style.bottom = (3 + barIndex * 17) + "px";
+            if (sameDay(cellDate, s)) bar.textContent = rg.name; // name shows on the first day
+            cell.appendChild(bar);
+            barIndex++;
+          }
+        });
+
+        dayCells[d] = cell;
         (function (dayNum) {
-          cell.addEventListener("click", function () { openDay(dayNum); });
+          cell.addEventListener("pointerdown", function (e) { startDrag(dayNum, e); });
         })(d);
         daysEl.appendChild(cell);
       }
@@ -216,6 +274,7 @@
     function renderEventList() {
       var ul = document.getElementById("eventList");
       ul.innerHTML = "";
+      var count = 0;
       var list = events[openKey] || [];
       list.forEach(function (text, i) {
         var li = document.createElement("li");
@@ -228,8 +287,25 @@
         });
         li.appendChild(span); li.appendChild(del);
         ul.appendChild(li);
+        count++;
       });
-      if (!list.length) {
+      // also show any multi-day events that cover this day
+      var here = keyToDate(openKey);
+      ranges.forEach(function (rg, ri) {
+        var s = keyToDate(rg.start), e = keyToDate(rg.end);
+        if (here >= s && here <= e) {
+          var li = document.createElement("li");
+          var span = document.createElement("span"); span.textContent = "🏖️ " + rg.name + " (multi-day)";
+          var del = document.createElement("button"); del.className = "del"; del.textContent = "✕";
+          del.addEventListener("click", function () {
+            ranges.splice(ri, 1); saveRanges(); renderEventList(); render();
+          });
+          li.appendChild(span); li.appendChild(del);
+          ul.appendChild(li);
+          count++;
+        }
+      });
+      if (!count) {
         var empty = document.createElement("li");
         empty.textContent = "Nothing here yet — add something!";
         ul.appendChild(empty);
@@ -266,6 +342,74 @@
     });
     document.getElementById("todayBtn").addEventListener("click", function () {
       viewYear = today.getFullYear(); viewMonth = today.getMonth(); render();
+    });
+
+    // ---- Drag across days to make a multi-day event ----
+    var dragging = false, dragStart = null, dragEnd = null, dragMoved = false;
+    function startDrag(dayNum, e) {
+      dragging = true; dragStart = dayNum; dragEnd = dayNum; dragMoved = false;
+      updateSelPreview();
+      e.preventDefault();
+    }
+    function dayUnderPoint(x, y) {
+      var el = document.elementFromPoint(x, y);
+      var cell = el && el.closest ? el.closest(".day") : null;
+      if (!cell || cell.classList.contains("blank") || !cell.dataset.day) return null;
+      return +cell.dataset.day;
+    }
+    window.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var d = dayUnderPoint(e.clientX, e.clientY);
+      if (d && d !== dragEnd) {
+        dragEnd = d;
+        if (d !== dragStart) dragMoved = true;
+        updateSelPreview();
+      }
+    });
+    window.addEventListener("pointerup", function () {
+      if (!dragging) return;
+      dragging = false;
+      clearSelPreview();
+      if (dragMoved && dragStart !== dragEnd) {
+        openRange(Math.min(dragStart, dragEnd), Math.max(dragStart, dragEnd)); // a dragged range
+      } else {
+        openDay(dragStart); // just a tap = a one-day event
+      }
+    });
+    function updateSelPreview() {
+      var lo = Math.min(dragStart, dragEnd), hi = Math.max(dragStart, dragEnd);
+      for (var d in dayCells) { var n = +d; dayCells[d].classList.toggle("selecting", n >= lo && n <= hi); }
+    }
+    function clearSelPreview() { for (var d in dayCells) dayCells[d].classList.remove("selecting"); }
+
+    // ---- Name-your-multi-day-event popup ----
+    var pendingRange = null;
+    function openRange(lo, hi) {
+      pendingRange = { start: keyFor(viewYear, viewMonth, lo), end: keyFor(viewYear, viewMonth, hi) };
+      document.getElementById("rangeTitle").textContent =
+        MONTHS[viewMonth] + " " + lo + " – " + hi + "  (" + (hi - lo + 1) + " days)";
+      document.getElementById("rangeInput").value = "";
+      document.getElementById("rangeModal").classList.add("show");
+      document.getElementById("rangeInput").focus();
+    }
+    function addRange() {
+      var input = document.getElementById("rangeInput");
+      var text = input.value.trim();
+      if (!text || !pendingRange) return;
+      ranges.push({ start: pendingRange.start, end: pendingRange.end, name: text,
+                    color: RANGE_COLORS[ranges.length % RANGE_COLORS.length] });
+      saveRanges();
+      document.getElementById("rangeModal").classList.remove("show");
+      pendingRange = null;
+      render();
+    }
+    document.getElementById("rangeAddBtn").addEventListener("click", addRange);
+    document.getElementById("rangeInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addRange(); });
+    document.getElementById("rangeCloseBtn").addEventListener("click", function () {
+      document.getElementById("rangeModal").classList.remove("show"); pendingRange = null;
+    });
+    document.getElementById("rangeModal").addEventListener("click", function (e) {
+      if (e.target === this) { this.classList.remove("show"); pendingRange = null; }
     });
 
     render();
