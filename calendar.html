@@ -584,7 +584,7 @@
     });
 
     // ---- Repeating pattern setup popup ----
-    var patColor1 = "#ff5fa2", patColor2 = "#2a6bff";
+    var patColor1 = "#ff5fa2", patColor2 = "#3fd0ff"; // Mom = pink, Dad = light blue
     function buildPatColorRow(rowId, current, onPick) {
       var row = document.getElementById(rowId);
       row.innerHTML = "";
@@ -615,8 +615,8 @@
       document.getElementById("patName1").value = (pattern && pattern.name1) || "Mom";
       document.getElementById("patName2").value = (pattern && pattern.name2) || "Dad";
       document.getElementById("patCounts").value = (pattern && pattern.counts) ? pattern.counts.join(",") : "5,5,2,2";
-      patColor1 = (pattern && pattern.color1) || "#ff5fa2";
-      patColor2 = (pattern && pattern.color2) || "#2a6bff";
+      patColor1 = (pattern && pattern.color1) || "#ff5fa2";  // Mom = pink
+      patColor2 = (pattern && pattern.color2) || "#3fd0ff";  // Dad = light blue
       buildPatColorRow("patColorRow1", function () { return patColor1; }, function (c) { patColor1 = c; });
       buildPatColorRow("patColorRow2", function () { return patColor2; }, function (c) { patColor2 = c; });
       updatePatEcho();
