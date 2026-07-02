@@ -416,6 +416,7 @@
     <p class="gamehint">🔥 Grab the red/orange/yellow BOOM ball, then CLICK to throw it — when it hits something, EVERY balloon on screen blows up!</p>
     <p class="gamehint">🤖 Rarely a MEGA BOSS appears — you suit up in armor with a giant auto-gun. Blast him to win big!</p>
     <p class="gamehint">🎵 Shoot the Music button (bottom-right) with a bullet to turn music on/off!</p>
+    <p class="gamehint">🎶 Press D while the music is on to switch songs — there are 5 to pick from!</p>
     <p class="gamehint">💀 Watch out for the spiky DANGER balloons — you can't pop them! Hide above a wall, or it's KABOOM and you start over!</p>
     <div class="score">Score: <span id="scoreNum">0</span></div>
   </div>
@@ -946,6 +947,26 @@
       step: 0.09, type: "sawtooth"
     };
 
+    // 5 DIFFERENT songs — press D to switch between them while music is on!
+    var TUNES = [
+      { name: "Adventure", type: "square", step: 0.16,
+        lead: [523, 587, 659, 587, 523, 0, 659, 0, 587, 659, 698, 659, 587, 0, 523, 0],
+        bass: [131, 196, 131, 196, 196, 147, 196, 147, 220, 165, 220, 165, 175, 131, 175, 131] },
+      { name: "Bouncy", type: "triangle", step: 0.12,
+        lead: [659, 0, 784, 0, 659, 784, 880, 784, 698, 0, 587, 0, 659, 698, 784, 0],
+        bass: [165, 165, 196, 196, 175, 175, 147, 147] },
+      { name: "Spooky", type: "sawtooth", step: 0.18,
+        lead: [440, 466, 440, 415, 392, 0, 440, 0, 349, 392, 440, 466, 440, 0, 392, 0],
+        bass: [110, 0, 117, 0, 98, 0, 110, 0] },
+      { name: "Techno", type: "square", step: 0.10,
+        lead: [880, 880, 988, 880, 784, 784, 880, 988, 1047, 988, 880, 784, 880, 988, 1047, 1175],
+        bass: [131, 131, 131, 196, 147, 147, 147, 196] },
+      { name: "Chill", type: "sine", step: 0.22,
+        lead: [523, 0, 587, 0, 659, 0, 587, 523, 494, 0, 523, 0, 587, 0, 523, 0],
+        bass: [131, 0, 147, 0, 165, 0, 147, 0] }
+    ];
+    var currentTune = 0; // which of the 5 songs is playing
+
     var musicBar = 0; // counts which part of the adventure song we're on
     var musicOn = false;
     var musicAllowed = true; // false if you turn it off on purpose
@@ -967,15 +988,15 @@
       if (!musicOn) return;
       var ac = ensureAudio(); if (!ac) return;
 
-      // While powered up, play the wild chaotic music; otherwise the adventure playlist
+      // While powered up, play the wild chaotic music; otherwise the song you picked with D
       var poweredUp = rainbowMode || fireMode || ultimateActive || blueMode;
-      var song = poweredUp ? chaosSong : songs[musicBar % songs.length];
+      var song = poweredUp ? chaosSong : TUNES[currentTune];
       var lead = song.lead, bass = song.bass, step = song.step;
 
       var t = ac.currentTime + 0.05;
       for (var i = 0; i < lead.length; i++) {
         playNote(lead[i], t + i * step, step * 0.9, song.type, 0.06);
-        playNote(bass[i], t + i * step, step * 0.9, "triangle", 0.09);
+        playNote(bass[i % bass.length], t + i * step, step * 0.9, "triangle", 0.09);
       }
       musicBar++;
       musicTimer = setTimeout(scheduleBar, lead.length * step * 1000); // next song
@@ -996,6 +1017,15 @@
     // Press M to turn the music on/off
     window.addEventListener("keydown", function (e) {
       if (e.key === "m" || e.key === "M") toggleMusic();
+    });
+    // Press D to switch to a different song (only while the music is on)
+    window.addEventListener("keydown", function (e) {
+      if (e.key !== "d" && e.key !== "D") return;
+      if (!musicOn) return;
+      currentTune = (currentTune + 1) % TUNES.length; // next of the 5 songs
+      if (musicTimer) clearTimeout(musicTimer);
+      scheduleBar(); // start the new song right away
+      makeFloater(W / 2, 150, "🎵 " + TUNES[currentTune].name, "#ffd23f");
     });
 
     // Throw the ball you're holding (used by the T key AND left-click)
